@@ -685,304 +685,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100
 </div><!-- /floorSection -->
 
 <!-- ═══ HOV TRACKER — Independent Dashboard Page ═══ -->
+<!-- ═══ HOV TRACKER — Independent Dashboard Page (4 file-type tabs) ═══ -->
 <div id="hovSection" class="page-section">
-  <!-- Shared Toolbar -->
-  <div id="hovTbar" style="background:var(--sur);border-bottom:1px solid var(--bdr);padding:9px 18px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-    <input type="file" id="hovFi" multiple accept=".csv,.xlsx,.xls" style="display:none">
-    <button class="btn bp" onclick="document.getElementById('hovFi').click()">📂 Upload HOV Files</button>
-    <button class="btn bk" onclick="onHovSave()">💾 Save HOV Data</button>
-    <button class="btn br" onclick="onHovClear()">🗑 Clear HOV Data</button>
-    <div class="sp"></div>
-  </div>
-  <div id="hovBrow" style="background:var(--sur2);border-bottom:1px solid var(--bdr);padding:6px 18px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-height:36px">
-    <span style="color:#94a3b8;font-size:11px">Upload Forward, Reverse, LMODC or Short Shipment files — HOV data extracted independently</span>
-  </div>
-  <div id="hovProg" style="display:none;background:var(--navy2);padding:7px 18px">
-    <div class="ptxt" id="hovPtxt">Processing…</div>
-    <div class="ptrk"><div class="pbar" id="hovPbar" style="width:0"></div></div>
+
+  <!-- ── Top-level file-type tab bar ── -->
+  <div id="hovTypeTabs" style="background:var(--sur);border-bottom:2px solid var(--bdr);display:flex;padding:0 16px;gap:2px;flex-wrap:wrap">
+    <button id="hovTypeTab_forward"      class="tab active" onclick="switchHovTypeTab('forward')"      style="font-size:12.5px;font-weight:800;padding:12px 22px;margin-bottom:-2px">📦 FORWARD</button>
+    <button id="hovTypeTab_reverse"      class="tab"        onclick="switchHovTypeTab('reverse')"      style="font-size:12.5px;font-weight:800;padding:12px 22px;margin-bottom:-2px">🔄 REVERSE</button>
+    <button id="hovTypeTab_forwardShort" class="tab"        onclick="switchHovTypeTab('forwardShort')" style="font-size:12.5px;font-weight:800;padding:12px 22px;margin-bottom:-2px">⚡ DCH</button>
+    <button id="hovTypeTab_lmodc"        class="tab"        onclick="switchHovTypeTab('lmodc')"        style="font-size:12.5px;font-weight:800;padding:12px 22px;margin-bottom:-2px">🏪 LMODC</button>
   </div>
 
-  <!-- ── 3-Tab bar ── -->
-  <div id="hovSubTabs" style="background:var(--sur);border-bottom:2px solid var(--bdr);display:flex;padding:0 16px">
-    <button id="hovSubTab0" class="tab active" onclick="switchHovSubTab(0)" style="font-size:12px;font-weight:800;padding:11px 18px;margin-bottom:-2px">📊 HOV OVERVIEW</button>
-    <button id="hovSubTab1" class="tab" onclick="switchHovSubTab(1)" style="font-size:12px;font-weight:800;padding:11px 18px;margin-bottom:-2px">🔍 HOV DETAILED</button>
-    <button id="hovSubTab2" class="tab" onclick="switchHovSubTab(2)" style="font-size:12px;font-weight:800;padding:11px 18px;margin-bottom:-2px">⏳ D15+ TRACKING</button>
-    <button id="hovSubTab3" class="tab" onclick="switchHovSubTab(3)" style="font-size:12px;font-weight:800;padding:11px 18px;margin-bottom:-2px">👤 ACTION USER TRENDS</button>
-    <button id="hovSubTab4" class="tab" onclick="switchHovSubTab(4)" style="font-size:12px;font-weight:800;padding:11px 18px;margin-bottom:-2px">🗺 REGION OVERVIEW</button>
-    <button id="hovSubTab5" class="tab" onclick="switchHovSubTab(5)" style="font-size:12px;font-weight:800;padding:11px 18px;margin-bottom:-2px">🤖 AI INSIGHTS</button>
-  </div>
+  <!-- Type panels are generated dynamically by buildHovTypePanels() -->
+  <div id="hovTypePanels"></div>
 
-  <!-- ════════════════════════════════════
-       TAB 0: HOV OVERVIEW
-       Components: Donut+PC filter · D2-D15 Table
-       Criticality · PV Table · Per-File Breakdown
-  ════════════════════════════════════ -->
-  <div id="hovSubPanel0" style="padding:14px;display:flex;flex-direction:column;gap:14px">
-
-    <!-- Slim toolbar: PDF export + PNG export — section-level filters are inside each file section -->
-    <div style="display:flex;align-items:center;justify-content:flex-end;padding:4px 2px;gap:8px">
-      <span style="font-size:10px;color:var(--tx3);font-style:italic">Filters available inside each section below</span>
-      <button class="btn bg" onclick="generateHovOverallPDF()" style="font-size:10px;padding:3px 8px;color:var(--brand);border-color:var(--bdr2)">📄 Overall PDF</button>
-      <button class="btn bg" onclick="downloadHovSectionImage('hovPerFileWrap','HOV_Overview.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 PNG All</button>
-    </div>
-
-    <!-- Per-File sections (primary view — no combined datasets) -->
-    <div id="hovPerFileWrap" style="display:flex;flex-direction:column;gap:20px"></div>
-  </div>
-
-  <!-- ════════════════════════════════════
-       TAB 1: HOV DETAILED
-       Components: AWB Search · DC filter
-       Forward R@DC Bin pivots
-       Reverse R@DC FLM / RLM / NoLandroval
-       Site-based detail table
-  ════════════════════════════════════ -->
-  <div id="hovSubPanel1" style="display:none;padding:14px;flex-direction:column;gap:14px">
-
-    <!-- Detailed filter bar -->
-    <div class="card">
-      <div style="padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase">🔍 Filters</span>
-        <select id="hovDetDCselect" class="dc-select" onchange="renderHovDetailed()" style="min-width:160px;font-size:11px"><option value="ALL">All Sites</option></select>
-        <!-- AWB search -->
-        <div style="display:flex;align-items:center;gap:6px">
-          <input id="hovAWBsearch" type="text" placeholder="🔍 Search AWB (D2–D15)…" style="font-size:11px;padding:5px 10px;border-radius:5px;border:1px solid var(--bdr2);outline:none;min-width:210px" oninput="renderHovAWBSearch(this.value)">
-          <button class="btn bg" onclick="document.getElementById('hovAWBsearch').value='';renderHovAWBSearch('')" style="font-size:10px;padding:4px 8px;color:var(--tx3)">✕</button>
-        </div>
-        <button class="btn bg" onclick="generateHovPDF(1)" style="font-size:10px;padding:4px 9px;color:var(--brand);border-color:var(--bdr2);margin-left:auto">📄 PDF</button>
-      </div>
-    </div>
-
-    <!-- AWB search result -->
-    <div id="hovAWBresultCard" style="display:none">
-      <div class="card">
-        <div class="chead"><span class="ct">🔎 AWB Search Result</span>
-          <button class="btn bg" onclick="downloadHovSectionImage('hovAWBresultCard','HOV_AWBSearch.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4);margin-left:auto">🖼 PNG</button>
-        </div>
-        <div id="hovAWBresultInner" style="overflow-x:auto"></div>
-      </div>
-    </div>
-
-    <!-- Site-based detail (shown when DC ≠ ALL) -->
-    <div id="hovSiteDetailCard" style="display:none">
-      <div class="card">
-        <div class="chead"><span class="ct" id="hovSiteDetailTitle">Site Detail</span>
-          <button class="btn bg" onclick="downloadHovSectionImage('hovSiteDetailCard','HOV_SiteDetail.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4);margin-left:auto">🖼 PNG</button>
-        </div>
-        <div id="hovSiteDetailWrap" style="overflow-x:auto"></div>
-      </div>
-    </div>
-
-    <!-- FORWARD R@DC pivots -->
-    <div class="card" id="hovFwdCard">
-      <div class="chead">
-        <span class="ct">📦 FORWARD R@DC — Bin × Message</span>
-        <button class="btn bg" onclick="downloadHovSectionImage('hovFwdCard','HOV_Forward.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4);margin-left:auto">🖼 PNG</button>
-      </div>
-      <div style="padding:12px;display:flex;flex-direction:column;gap:12px">
-        <div>
-          <div style="font-size:11px;font-weight:800;color:var(--brand);margin-bottom:6px;text-transform:uppercase">PASSED BIN 1 — Age × Message pivot (AWB count)</div>
-          <div id="hovFwdBin1Wrap" style="overflow-x:auto"></div>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:800;color:var(--brand);margin-bottom:6px;text-transform:uppercase">PASSED BIN 2 — Age × Message pivot (AWB count)</div>
-          <div id="hovFwdBin2Wrap" style="overflow-x:auto"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- REVERSE R@DC pivots -->
-    <div class="card" id="hovRevCard">
-      <div class="chead">
-        <span class="ct">🔄 REVERSE R@DC — Leg Miss Analysis</span>
-        <button class="btn bg" onclick="downloadHovSectionImage('hovRevCard','HOV_Reverse.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4);margin-left:auto">🖼 PNG</button>
-      </div>
-      <div style="padding:12px;display:flex;flex-direction:column;gap:16px">
-        <div>
-          <div style="font-size:12px;font-weight:900;color:#dc2626;margin-bottom:8px;text-transform:uppercase;border-bottom:2px solid #dc2626;padding-bottom:4px">1. FORWARD LEG MISS (bin_level × message)</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px">PASSED BIN 1</div>
-              <div id="hovRevFLMBin1Wrap" style="overflow-x:auto"></div>
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px">PASSED BIN 2</div>
-              <div id="hovRevFLMBin2Wrap" style="overflow-x:auto"></div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div style="font-size:12px;font-weight:900;color:#d97706;margin-bottom:8px;text-transform:uppercase;border-bottom:2px solid #d97706;padding-bottom:4px">2. REVERSE LEG MISS (DSP bin_level × DSP message)</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px">PASSED BIN 1</div>
-              <div id="hovRevRLMBin1Wrap" style="overflow-x:auto"></div>
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px">PASSED BIN 2</div>
-              <div id="hovRevRLMBin2Wrap" style="overflow-x:auto"></div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div style="font-size:12px;font-weight:900;color:#7c3aed;margin-bottom:8px;text-transform:uppercase;border-bottom:2px solid #7c3aed;padding-bottom:4px">3. NO LANDROVAL DETAILS</div>
-          <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">All four fields (#N/A or blank): bin_level · message · DSP bin_level · DSP message</div>
-          <div id="hovRevNoLandWrap" style="overflow-x:auto"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ════════════════════════════════════
-       TAB 2: D15+ TRACKING
-       Per-file separate visibility
-  ════════════════════════════════════ -->
-  <div id="hovSubPanel2" style="display:none;padding:14px;flex-direction:column;gap:14px">
-    <div class="card">
-      <div style="padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase">⏳ D15+ TRACKING</span>
-        <select id="hovD15DCselect" class="dc-select" onchange="renderHovD15Tab()" style="min-width:160px;font-size:11px"><option value="ALL">All Sites</option></select>
-        <button class="btn bg" onclick="generateHovPDF(2)" style="font-size:10px;padding:4px 9px;color:var(--brand);border-color:var(--bdr2);margin-left:auto">📄 PDF</button>
-        <button class="btn bg" onclick="downloadHovSectionImage('hovD15TabContent','HOV_D15plus.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 PNG</button>
-      </div>
-    </div>
-    <div id="hovD15TabContent" style="display:flex;flex-direction:column;gap:14px">
-      <div class="card" id="hovD15Card">
-        <div class="chead"><span class="ct">D16 → D90 — All Files Combined</span><span class="cbg">LOCATION × AGE</span></div>
-        <div id="hovD15Wrap" style="overflow-x:auto"></div>
-      </div>
-      <div class="card" id="hovD15AWBCard" style="display:none">
-        <div class="chead">
-          <span class="ct" id="hovD15AWBTitle">AWB Detail</span>
-          <span class="cbg">D16–D90 · FULL AWB LIST</span>
-          <button class="btn bg" onclick="downloadHovSectionImage('hovD15AWBCard','HOV_D15_AWBDetail.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4);margin-left:auto">🖼 PNG</button>
-        </div>
-        <div id="hovD15AWBWrap" style="overflow-x:auto"></div>
-      </div>
-      <div id="hovD15PerFileWrap" style="display:flex;flex-direction:column;gap:14px"></div>
-    </div>
-  </div>
-
-  <!-- ════════════════════════════════════
-       TAB 3: ACTION USER TRENDS
-  ════════════════════════════════════ -->
-  <div id="hovSubPanel3" style="display:none;padding:14px;flex-direction:column;gap:14px">
-    <div class="card">
-      <div style="padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase">👤 Action User Trends</span>
-        <select id="hovAUFileType" class="dc-select" onchange="renderHovActionUser()" style="min-width:160px;font-size:11px">
-          <option value="ALL">All File Types</option>
-          <option value="forward">📦 Forward</option>
-          <option value="reverse_fwd">🔄 Reverse — FWD Leg Miss</option>
-          <option value="reverse_rev">🔄 Reverse — REV Leg Miss</option>
-        </select>
-        <select id="hovAUMinAWB" class="dc-select" onchange="renderHovActionUser()" style="min-width:180px;font-size:11px">
-          <option value="2">Min AWBs per User: 2+</option>
-          <option value="3">Min AWBs per User: 3+</option>
-          <option value="5">Min AWBs per User: 5+</option>
-          <option value="10">Min AWBs per User: 10+</option>
-        </select>
-        <button class="btn bg" onclick="generateHovPDF(3)" style="font-size:10px;padding:4px 9px;color:var(--brand);border-color:var(--bdr2);margin-left:auto">📄 PDF</button>
-        <button class="btn bg" onclick="downloadHovSectionImage('hovAUContent','HOV_ActionUser.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 PNG</button>
-      </div>
-      <!-- WhatsApp-style search for Action User -->
-      <div style="padding:6px 16px 10px;border-top:1px solid var(--bdr);display:flex;align-items:center;gap:8px">
-        <span style="font-size:10px;font-weight:700;color:#64748b;white-space:nowrap">🔍 Search Action User:</span>
-        <input id="hovAUSearchInput" type="text" placeholder="Type Action User ID…" oninput="hovAUSearch(this.value)"
-          style="flex:1;font-size:11px;padding:5px 10px;border-radius:5px;border:1px solid var(--bdr2);outline:none;max-width:300px">
-        <button onclick="document.getElementById('hovAUSearchInput').value='';hovAUSearch('')"
-          style="font-size:10px;padding:4px 8px;border-radius:4px;border:1px solid var(--bdr2);background:#f1f5f9;cursor:pointer;color:#64748b">✕</button>
-      </div>
-    </div>
-    <div id="hovAUContent" style="display:flex;flex-direction:column;gap:14px"></div>
-  </div>
-
-  <!-- ════════════════════════════════════
-       TAB 4: REGION OVERVIEW
-  ════════════════════════════════════ -->
-  <div id="hovSubPanel4" style="display:none;padding:14px;flex-direction:column;gap:20px">
-    <!-- Region Overview export toolbar -->
-    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:2px 0">
-      <button class="btn bg" onclick="generateHovPDF(4)" style="font-size:10px;padding:3px 8px;color:var(--brand);border-color:var(--bdr2)">📄 Overall PDF</button>
-      <button class="btn bg" onclick="downloadHovSectionImage('hovSubPanel4','HOV_Region_Overview.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 PNG All</button>
-    </div>
-
-    <!-- FORWARD R@DC -->
-    <div class="card" style="border-left:5px solid #1e40af;padding:0;overflow:visible">
-      <div style="background:#1e40af;padding:11px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span style="font-size:12px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.7px">📦 FORWARD R@DC — REGION OVERVIEW</span>
-        <button class="btn" onclick="downloadHovSectionImage('hovRegFwdContent','HOV_Fwd_Region.png')" style="font-size:10px;padding:3px 9px;color:#bfdbfe;border-color:rgba(255,255,255,.35)">🖼 PNG</button>
-      </div>
-      <div style="padding:10px 16px;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:relative;z-index:110;overflow:visible">
-        <span style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase">Select Region</span>
-        <div style="position:relative" id="hovRegFwdWrap">
-          <div onclick="_regToggle('fwd')" id="hovRegFwdTrig"
-            style="font-size:11px;padding:6px 30px 6px 11px;border-radius:5px;border:1.5px solid #1e40af;background:#fff;
-              color:#1e3a6e;min-width:210px;cursor:pointer;position:relative;font-weight:700;white-space:nowrap">
-            <span id="hovRegFwdLabel">— choose region —</span>
-            <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);color:#1e40af">▾</span>
-          </div>
-          <div id="hovRegFwdDrop" style="display:none;position:absolute;top:calc(100% + 5px);left:0;width:250px;background:#fff;
-            border:1.5px solid #1e40af;border-radius:7px;box-shadow:0 10px 32px rgba(30,64,175,.22);z-index:9999;flex-direction:column">
-            <div style="padding:7px 10px;border-bottom:1px solid #dbeafe">
-              <input id="hovRegFwdSearch" type="text" placeholder="Search region…" autocomplete="off"
-                style="width:100%;font-size:11px;padding:5px 9px;border-radius:4px;border:1px solid #bfdbfe;outline:none;color:#1e3a6e;box-sizing:border-box"
-                oninput="_regRenderList('fwd',this.value)">
-            </div>
-            <div id="hovRegFwdList" style="overflow-y:auto;max-height:220px;padding:3px 0"></div>
-          </div>
-        </div>
-      </div>
-      <div id="hovRegFwdContent" style="padding:14px 16px;min-height:50px">
-        <div style="color:#94a3b8;font-size:11px;font-style:italic">Select a region above to view Forward R@DC data.</div>
-      </div>
-    </div>
-
-    <!-- REVERSE R@DC -->
-    <div class="card" style="border-left:5px solid #065f46;padding:0;overflow:visible">
-      <div style="background:#065f46;padding:11px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span style="font-size:12px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.7px">🔄 REVERSE R@DC — REGION OVERVIEW</span>
-        <button class="btn" onclick="downloadHovSectionImage('hovRegRevContent','HOV_Rev_Region.png')" style="font-size:10px;padding:3px 9px;color:#a7f3d0;border-color:rgba(255,255,255,.35)">🖼 PNG</button>
-      </div>
-      <div style="padding:10px 16px;border-bottom:1px solid #d1fae5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:relative;z-index:105;overflow:visible">
-        <span style="font-size:10px;font-weight:800;color:#065f46;text-transform:uppercase">Select Region</span>
-        <div style="position:relative" id="hovRegRevWrap">
-          <div onclick="_regToggle('rev')" id="hovRegRevTrig"
-            style="font-size:11px;padding:6px 30px 6px 11px;border-radius:5px;border:1.5px solid #065f46;background:#fff;
-              color:#052e16;min-width:210px;cursor:pointer;position:relative;font-weight:700;white-space:nowrap">
-            <span id="hovRegRevLabel">— choose region —</span>
-            <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);color:#065f46">▾</span>
-          </div>
-          <div id="hovRegRevDrop" style="display:none;position:absolute;top:calc(100% + 5px);left:0;width:250px;background:#fff;
-            border:1.5px solid #065f46;border-radius:7px;box-shadow:0 10px 32px rgba(6,95,70,.22);z-index:9999;flex-direction:column">
-            <div style="padding:7px 10px;border-bottom:1px solid #d1fae5">
-              <input id="hovRegRevSearch" type="text" placeholder="Search region…" autocomplete="off"
-                style="width:100%;font-size:11px;padding:5px 9px;border-radius:4px;border:1px solid #a7f3d0;outline:none;color:#052e16;box-sizing:border-box"
-                oninput="_regRenderList('rev',this.value)">
-            </div>
-            <div id="hovRegRevList" style="overflow-y:auto;max-height:220px;padding:3px 0"></div>
-          </div>
-        </div>
-      </div>
-      <div id="hovRegRevContent" style="padding:14px 16px;min-height:50px">
-        <div style="color:#94a3b8;font-size:11px;font-style:italic">Select a region above to view Reverse R@DC data.</div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ════ TAB 5: AI INSIGHTS ════ -->
-  <div id="hovSubPanel5" style="display:none;padding:14px;flex-direction:column;gap:16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:4px 0">
-      <span style="font-size:11px;color:var(--tx3);font-style:italic">🤖 Auto-generated operational insights from uploaded HOV data</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn bg" onclick="generateHovPDF(5)" style="font-size:10px;padding:3px 8px;color:var(--brand);border-color:var(--bdr2)">📄 PDF Report</button>
-        <button class="btn bg" onclick="downloadHovSectionImage('hovAIContent','HOV_AI_Insights.png')" style="font-size:10px;padding:3px 8px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 PNG</button>
-        <button class="btn bg" onclick="renderHovAIInsights()" style="font-size:10px;padding:3px 8px;color:var(--brand);border-color:var(--bdr2)">🔄 Refresh</button>
-      </div>
-    </div>
-    <div id="hovAIContent" style="display:flex;flex-direction:column;gap:20px"></div>
-  </div>
 </div>
 
 <!-- ═══ TARGET ACHIEVED % REPORT — Independent Page ═══ -->
@@ -4240,7 +3956,9 @@ function pHovFwd(row,date,agg){
     const region=(gv(row,'region','Region','REGION','Zone','zone','ZONE')||'').toUpperCase().trim();
     // CLIENT — actual client/seller name (column AFTER region in HOV files)
     const client=gv(row,'client','Client','CLIENT','seller_name','Seller_Name','seller name','client_name','Client_Name')||'';
-    agg.__allRaw.push({awb,pv,pd,loc,pc,client,date,age,region,fileType:'forward',binLevel,msg,dspBin,dspMsg,actionUser,dspActionUser});
+    // PIVOT — Forward-tab filter column (AT DOCK / R@DC / BRSNR / PFC). Read-only capture.
+    const pivot=String(gv(row,'pivot','Pivot','PIVOT')||'').toUpperCase().trim();
+    agg.__allRaw.push({awb,pv,pd,loc,pc,client,date,age,region,pivot,fileType:'forward',binLevel,msg,dspBin,dspMsg,actionUser,dspActionUser});
   }
 
   if(age<2||age>15)return; // age gate for D2-D15 tracking only
@@ -4291,7 +4009,9 @@ function pHovRev(row,date,agg){
     const dspActionUser=String(gv(row,'dsp action_user','DSP action_user','dsp_action_user','DSP_action_user','DSP_Action_User')||'');
     const region2=(gv(row,'region','Region','REGION','Zone','zone','ZONE')||'').toUpperCase().trim();
     const client2=gv(row,'client','Client','CLIENT','seller_name','Seller_Name','seller name','client_name','Client_Name')||'';
-    agg.__allRaw.push({awb,pv,pd,loc,pc,client:client2,date,age,region:region2,fileType:'reverse',binLevel,msg,dspBin,dspMsg,actionUser,dspActionUser});
+    // REASON OF LOSS — Reverse-tab filter column. Read-only capture.
+    const reason2=String(gv(row,'reason of loss','Reason of Loss','reason_of_loss','Reason_of_Loss','Reason Of Loss','reasonofloss','REASON OF LOSS')||'').toUpperCase().trim();
+    agg.__allRaw.push({awb,pv,pd,loc,pc,client:client2,date,age,region:region2,reason:reason2,fileType:'reverse',binLevel,msg,dspBin,dspMsg,actionUser,dspActionUser});
   }
 
   if(age<2||age>15)return;
@@ -4309,9 +4029,24 @@ function pHovLM(row,date,agg){
   if(flag!=='HOV')return;
   const ageStr=gv(row,'ageing','Ageing');
   const age=Math.round(parseLMODCAge(ageStr));
-  if(age<2||age>15)return;
   const loc=(gv(row,'destination_name','Destination_name','Destination_Name','destination','Destination')||'UNKNOWN').toUpperCase();
   const pc=gv(row,'pc','PC','product category','Product Category','product_category','Product_Category')||'UNKNOWN';
+  // ── All-age raw capture (read-only; mirrors Forward/Reverse) — used by HOV Tracker
+  //    Overview / PV Trends / D15+ tables. Does NOT change any existing rule. ──
+  const awb=gv(row,'awb_number','Awb_number','AWB_NUMBER','awb number','awb','AWB','dsp_awb_number','DSP_Awb_number')||'';
+  const pvRaw=gv(row,'product value','PRODUCT VALUE','product_value','Product_Value','Product Value','productvalue')||'';
+  const pv=parseFloat(String(pvRaw).replace(/[₹,\s]/g,''))||0;
+  const pd=gv(row,'pd','PD','product description','Product Description','product_description','Product_Description','productdescription')||'';
+  if(awb){
+    if(!agg.__allRaw)agg.__allRaw=[];
+    const region=(gv(row,'region','Region','REGION','Zone','zone','ZONE')||'').toUpperCase().trim();
+    agg.__allRaw.push({awb,pv,pd,loc,pc,date,age,region,fileType:'lmodc'});
+    if(age>=2&&age<=15){
+      if(!agg.__pv)agg.__pv=[];
+      agg.__pv.push({awb,pv,pd,loc,pc,date,age,fileType:'lmodc'});
+    }
+  }
+  if(age<2||age>15)return;
   const k=`${age}|${loc}|${pc}`;
   if(!agg[k])agg[k]={date,age,location:loc,pc,fileType:'lmodc',count:0};
   agg[k].count++;
@@ -4323,9 +4058,24 @@ function pHovSh(row,date,agg){
   const age=Math.round(gn(row,
     'ageing_from_bag_rec','Ageing_from_Bag_Rec','Ageing_From_Bag_Rec',
     'ageing from bag rec','ageing_from_bag_recc','ageing','Ageing','age','Age'));
-  if(age<2||age>15)return;
   const loc=(gv(row,'current_location','Current_location','Current_Location','location','Location')||'UNKNOWN').toUpperCase();
   const pc=gv(row,'pc','PC','product category','Product Category','product_category','Product_Category')||'UNKNOWN';
+  // ── All-age raw capture (read-only; mirrors Forward/Reverse) — used by HOV Tracker
+  //    Overview / PV Trends / D15+ tables. Does NOT change any existing rule. ──
+  const awb=gv(row,'awb_number','Awb_number','AWB_NUMBER','awb number','awb','AWB')||'';
+  const pvRaw=gv(row,'product value','PRODUCT VALUE','product_value','Product_Value','Product Value','productvalue')||'';
+  const pv=parseFloat(String(pvRaw).replace(/[₹,\s]/g,''))||0;
+  const pd=gv(row,'pd','PD','product description','Product Description','product_description','Product_Description','productdescription')||'';
+  if(awb){
+    if(!agg.__allRaw)agg.__allRaw=[];
+    const region=(gv(row,'region','Region','REGION','Zone','zone','ZONE')||'').toUpperCase().trim();
+    agg.__allRaw.push({awb,pv,pd,loc,pc,date,age,region,fileType:'forwardShort'});
+    if(age>=2&&age<=15){
+      if(!agg.__pv)agg.__pv=[];
+      agg.__pv.push({awb,pv,pd,loc,pc,date,age,fileType:'forwardShort'});
+    }
+  }
+  if(age<2||age>15)return;
   const k=`${age}|${loc}|${pc}`;
   if(!agg[k])agg[k]={date,age,location:loc,pc,fileType:'forwardShort',count:0};
   agg[k].count++;
@@ -4444,6 +4194,7 @@ async function procHovFile(file,type,date){
             },
             complete(){
               const pvRows=agg.__pv||[];delete agg.__pv;
+              const allRawRows=agg.__allRaw||[];delete agg.__allRaw;
               const recs=Object.values(agg);
               master.hov=(master.hov||[]).filter(r=>!(r.date===date&&r.fileType===type));
               master.hov.push(...recs);
@@ -4452,6 +4203,12 @@ async function procHovFile(file,type,date){
                 master.hovPV=master.hovPV.filter(r=>!(r.date===date&&r.fileType===type));
                 pvRows.forEach(r=>r.fileType=type);
                 master.hovPV.push(...pvRows);
+              }
+              if(allRawRows.length){
+                if(!master.hovAllRaw)master.hovAllRaw=[];
+                master.hovAllRaw=master.hovAllRaw.filter(r=>!(r.date===date&&r.fileType===type));
+                allRawRows.forEach(r=>r.fileType=type);
+                master.hovAllRaw.push(...allRawRows);
               }
               resolve();
             },
@@ -5294,23 +5051,516 @@ function toggleHovChartType(){
 }
 
 /* ── Main HOV render ── */
+/* renderHovTab — entry point for the redesigned 4-tab HOV Tracker.
+   Builds the type panels once, then renders the active file-type tab. */
 function renderHovTab(){
-  populateHovPC();
-  populateHovDCDropdown();
-  const pcs=getHovPCs();
-  // Grand total (across all files matching filter)
-  const grand=(master.hov||[]).filter(r=>{
-    if(r.age<2||r.age>15)return false;
-    if(pcs&&pcs.length>0&&!pcs.includes(r.pc))return false;
-    if(!_hovDCFilter(r.location))return false;
-    return true;
-  }).reduce((s,r)=>s+r.count,0);
-  const tot=document.getElementById('hovGrandTotal');
-  if(tot)tot.textContent=grand?fn(grand)+' AWBs':'–';
-
-  // Primary render: per-file sections (no combined view)
-  renderHovPerFile(pcs);
+  buildHovTypePanels();
+  renderHovType(_hovActiveType);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   HOV TRACKER ENGINE — 4 independent file-type tabs
+   FORWARD · REVERSE · DCH (forwardShort) · LMODC
+   Each tab: own upload, own filters, and 3 sections in fixed order:
+     1. HOV OVERVIEW         (donut + Product-Value/AWB table)
+     2. HOV PRODUCT VALUE TRENDS (Current Location × Ageing pivot, sum PV)
+     3. D15+ TRACKER         (existing per-file D15+ list + new D16–D90 pivot)
+   Reuses existing data store master.hovAllRaw (all-age raw rows) and the
+   existing parsing / ageing / location / PC / HOV-filter business logic.
+═══════════════════════════════════════════════════════════════════════ */
+
+/* File-type metadata */
+const HOV_TYPES=[
+  {key:'forward',     label:'FORWARD', icon:'📦'},
+  {key:'reverse',     label:'REVERSE', icon:'🔄'},
+  {key:'forwardShort',label:'DCH',     icon:'⚡'},
+  {key:'lmodc',       label:'LMODC',   icon:'🏪'}
+];
+const HOV_TYPE_LABELS={forward:'FORWARD',reverse:'REVERSE',forwardShort:'DCH',lmodc:'LMODC'};
+
+/* Tab-specific filter option lists (spec-defined) */
+const HOV_PIVOT_OPTIONS =['ALL','AT DOCK','R@DC','BRSNR','PFC'];
+const HOV_REASON_OPTIONS=['ALL','MANIFESTED','VIA DC PENDENCY','CONNECTION PENDENCY','R@DC','BRSNR','MISROUTED'];
+
+/* Active type + per-type filter state */
+let _hovActiveType='forward';
+const _hovTypeFilter={};   // per-type: {special, loc, pc}
+HOV_TYPES.forEach(t=>{_hovTypeFilter[t.key]={special:'ALL',loc:'ALL',pc:'ALL'};});
+const _hovTypeCharts={};   // per-type donut chart instances
+let _hovPanelsBuilt=false;
+
+/* Map a raw special value (PIVOT / REASON OF LOSS) to a normalised bucket so
+   the dropdown's fixed options match the file's free-text values.
+   Returns the canonical option string, or the raw upper value if unmatched. */
+function hovNormPivot(v){
+  const s=String(v||'').toUpperCase().replace(/[_\s]+/g,' ').trim();
+  if(!s)return '';
+  if(s.includes('AT DOCK')||s==='ATDOCK'||s==='DOCK')return 'AT DOCK';
+  if(s.includes('BRSNR'))return 'BRSNR';
+  if(s.includes('PFC'))return 'PFC';
+  if(s.includes('R@DC')||s.includes('RADC')||s.includes('RECEIVED AT DC')||s==='R DC'||s.includes('R DC'))return 'R@DC';
+  return s;
+}
+function hovNormReason(v){
+  const s=String(v||'').toUpperCase().replace(/[_\s]+/g,' ').trim();
+  if(!s)return '';
+  if(s.includes('MANIFEST'))return 'MANIFESTED';
+  if(s.includes('VIA DC')||s.includes('VIADC'))return 'VIA DC PENDENCY';
+  if(s.includes('CONNECTION'))return 'CONNECTION PENDENCY';
+  if(s.includes('MISROUT'))return 'MISROUTED';
+  if(s.includes('BRSNR'))return 'BRSNR';
+  if(s.includes('R@DC')||s.includes('RADC')||s.includes('RECEIVED AT DC'))return 'R@DC';
+  return s;
+}
+
+/* All-age rows for one file type (independent per tab). */
+function hovRowsForType(type){
+  return (master.hovAllRaw||[]).filter(r=>r.fileType===type);
+}
+
+/* Apply the tab-specific special filter (PIVOT for forward, REASON for reverse). */
+function hovApplySpecial(rows,type){
+  const f=_hovTypeFilter[type];
+  if(!f||f.special==='ALL')return rows;
+  if(type==='forward')  return rows.filter(r=>hovNormPivot(r.pivot)===f.special);
+  if(type==='reverse')  return rows.filter(r=>hovNormReason(r.reason)===f.special);
+  return rows;
+}
+
+/* Apply the two Overview filters (Current Location + Product Category). */
+function hovApplyOverviewFilters(rows,type){
+  const f=_hovTypeFilter[type];
+  return rows.filter(r=>{
+    if(f.loc&&f.loc!=='ALL'&&(r.loc||'UNKNOWN')!==f.loc)return false;
+    if(f.pc &&f.pc !=='ALL'&&(r.pc ||'UNKNOWN')!==f.pc )return false;
+    return true;
+  });
+}
+
+/* Fully-filtered rows for the active tab (special + overview filters). */
+function hovFilteredRows(type){
+  return hovApplyOverviewFilters(hovApplySpecial(hovRowsForType(type),type),type);
+}
+
+/* ── Build the four type panels (once) ── */
+function buildHovTypePanels(){
+  if(_hovPanelsBuilt&&document.getElementById('hovPanel_forward'))return;
+  const wrap=document.getElementById('hovTypePanels');
+  if(!wrap)return;
+  wrap.innerHTML=HOV_TYPES.map(t=>hovPanelHTML(t)).join('');
+  _hovPanelsBuilt=true;
+  // Show the active panel, hide the rest
+  HOV_TYPES.forEach(t=>{
+    const p=document.getElementById('hovPanel_'+t.key);
+    if(p)p.style.display=(t.key===_hovActiveType)?'block':'none';
+  });
+  applyRoleUI(); // keep admin-only upload/save/clear buttons consistent
+}
+
+/* HTML for a single file-type panel. */
+function hovPanelHTML(t){
+  const k=t.key;
+  const isAdmin=_role==='admin';
+  const acceptTypes=(k==='lmodc')?'.csv,.xlsx,.xls':'.xlsx,.xls';
+  // Tab-specific filter control
+  let specialFilter='';
+  if(k==='forward'){
+    specialFilter=`<div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase">Pivot</span>
+        <select id="hovSpecial_${k}" class="dc-select" onchange="onHovSpecialChange('${k}',this.value)" style="min-width:150px;font-size:11px">
+          ${HOV_PIVOT_OPTIONS.map(o=>`<option value="${xe(o)}">${o==='ALL'?'ALL (combined)':xe(o)}</option>`).join('')}
+        </select></div>`;
+  }else if(k==='reverse'){
+    specialFilter=`<div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase">Reason of Loss</span>
+        <select id="hovSpecial_${k}" class="dc-select" onchange="onHovSpecialChange('${k}',this.value)" style="min-width:185px;font-size:11px">
+          ${HOV_REASON_OPTIONS.map(o=>`<option value="${xe(o)}">${o==='ALL'?'ALL (combined)':xe(o)}</option>`).join('')}
+        </select></div>`;
+  }
+
+  return `<div id="hovPanel_${k}" class="hov-type-panel" style="display:none;padding:14px;flex-direction:column;gap:14px">
+
+    <!-- Toolbar: upload + save/clear + tab-specific filter -->
+    <div class="card">
+      <div style="padding:11px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <input type="file" id="hovFile_${k}" accept="${acceptTypes}" style="display:none">
+        <button class="btn bp" onclick="document.getElementById('hovFile_${k}').click()">📂 Upload ${xe(t.label)} File</button>
+        <button class="btn bk" onclick="onHovSave()">💾 Save HOV Data</button>
+        <button class="btn br" onclick="onHovClearType('${k}')">🗑 Clear ${xe(t.label)}</button>
+        <div style="flex:1"></div>
+        ${specialFilter}
+      </div>
+      <div id="hovBadge_${k}" style="padding:0 16px 10px;font-size:11px;color:var(--tx3)">
+        No ${xe(t.label)} file uploaded yet. Accepts ${k==='lmodc'?'CSV/Excel':'Excel'} up to ~200&nbsp;MB.
+      </div>
+    </div>
+
+    <!-- ═ SECTION 1 — HOV OVERVIEW ═ -->
+    <div class="card">
+      <div class="chead"><span class="ct">📊 HOV OVERVIEW — D2 → D15</span>
+        <span id="hovOvTotal_${k}" style="margin-left:auto;font-size:11px;font-weight:800;color:var(--brand)">–</span>
+      </div>
+      <div style="padding:12px 16px;display:flex;flex-direction:column;gap:14px">
+        <!-- Overview filters -->
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase">Current Location</span>
+            <select id="hovLoc_${k}" class="dc-select" onchange="onHovOverviewFilter('${k}','loc',this.value)" style="min-width:170px;font-size:11px"><option value="ALL">All Locations</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase">Product Category</span>
+            <select id="hovPC_${k}" class="dc-select" onchange="onHovOverviewFilter('${k}','pc',this.value)" style="min-width:170px;font-size:11px"><option value="ALL">All Categories</option></select>
+          </div>
+        </div>
+        <!-- Donut + table grid -->
+        <div style="display:grid;grid-template-columns:minmax(300px,1fr) minmax(320px,1.2fr);gap:16px;align-items:start" class="hov-ov-grid">
+          <div>
+            <div style="font-size:11px;font-weight:800;color:var(--tx2);text-transform:uppercase;margin-bottom:6px">AWB Count by Current Location</div>
+            <div style="position:relative;height:300px"><canvas id="hovDonut_${k}"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:800;color:var(--tx2);text-transform:uppercase;margin-bottom:6px">Product Value · AWB (highest → lowest)</div>
+            <div id="hovPVAwb_${k}"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═ SECTION 2 — HOV PRODUCT VALUE TRENDS ═ -->
+    <div class="card">
+      <div class="chead"><span class="ct">💰 HOV PRODUCT VALUE TRENDS</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--tx3);font-style:italic">Sum of Product Value · Current Location × Ageing</span>
+      </div>
+      <div style="padding:12px 16px">
+        <div id="hovPVTrends_${k}"></div>
+      </div>
+    </div>
+
+    <!-- ═ SECTION 3 — D15+ TRACKER ═ -->
+    <div class="card">
+      <div class="chead"><span class="ct">⏳ D15+ TRACKER</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--tx3);font-style:italic">Ageing D16 → D90 · AWB count</span>
+      </div>
+      <div style="padding:12px 16px;display:flex;flex-direction:column;gap:16px">
+        <div id="hovD15List_${k}"></div>
+        <div>
+          <div style="font-size:11px;font-weight:800;color:var(--tx2);text-transform:uppercase;margin-bottom:6px">Ageing Summary — Current Location × Age (D16–D90)</div>
+          <div id="hovD15Pivot_${k}"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>`;
+}
+
+/* ── Tab switch ── */
+function switchHovTypeTab(type){
+  _hovActiveType=type;
+  HOV_TYPES.forEach(t=>{
+    const btn=document.getElementById('hovTypeTab_'+t.key);
+    if(btn)btn.classList.toggle('active',t.key===type);
+    const p=document.getElementById('hovPanel_'+t.key);
+    if(p)p.style.display=(t.key===type)?'block':'none';
+  });
+  renderHovType(type);
+}
+
+/* ── Filter change handlers ── */
+function onHovSpecialChange(type,val){
+  _hovTypeFilter[type].special=val;
+  // When the special filter changes, repopulate loc/pc options from that subset
+  renderHovType(type);
+}
+function onHovOverviewFilter(type,field,val){
+  _hovTypeFilter[type][field]=val;
+  renderHovTypeOverview(type);   // overview-only refresh keeps it snappy
+  renderHovTypePVTrends(type);
+  renderHovTypeD15(type);
+}
+
+/* ── Populate the Current Location + Product Category dropdowns ──
+   Options are derived from the rows that survive the special filter so the
+   choices always reflect the current PIVOT / REASON selection.            */
+function populateHovOverviewDropdowns(type){
+  const base=hovApplySpecial(hovRowsForType(type),type);
+  const f=_hovTypeFilter[type];
+  const locSel=document.getElementById('hovLoc_'+type);
+  const pcSel =document.getElementById('hovPC_'+type);
+  if(locSel){
+    const locs=[...new Set(base.map(r=>r.loc||'UNKNOWN'))].sort();
+    if(!locs.includes(f.loc))f.loc='ALL';
+    locSel.innerHTML='<option value="ALL">All Locations</option>'+locs.map(l=>`<option value="${xe(l)}">${xe(l)}</option>`).join('');
+    locSel.value=f.loc;
+  }
+  if(pcSel){
+    const pcs=[...new Set(base.map(r=>r.pc||'UNKNOWN'))].filter(p=>p&&p!=='UNKNOWN').sort();
+    if(!pcs.includes(f.pc))f.pc='ALL';
+    pcSel.innerHTML='<option value="ALL">All Categories</option>'+pcs.map(p=>`<option value="${xe(p)}">${xe(p)}</option>`).join('');
+    pcSel.value=f.pc;
+  }
+}
+
+/* ── Render one full file-type tab ── */
+function renderHovType(type){
+  if(!_hovPanelsBuilt)buildHovTypePanels();
+  populateHovOverviewDropdowns(type);
+  updateHovBadge(type);
+  renderHovTypeOverview(type);
+  renderHovTypePVTrends(type);
+  renderHovTypeD15(type);
+}
+
+/* Upload badge / counts under the toolbar. */
+function updateHovBadge(type){
+  const el=document.getElementById('hovBadge_'+type);
+  if(!el)return;
+  const all=hovRowsForType(type);
+  if(!all.length){
+    el.innerHTML=`No ${xe(HOV_TYPE_LABELS[type])} file uploaded yet. Accepts ${type==='lmodc'?'CSV/Excel':'Excel'} up to ~200&nbsp;MB.`;
+    el.style.color='var(--tx3)';
+    return;
+  }
+  const dates=[...new Set(all.map(r=>r.date).filter(Boolean))];
+  const filtered=hovApplySpecial(all,type).length;
+  const specTxt=(_hovTypeFilter[type].special!=='ALL')?` · filter: ${xe(_hovTypeFilter[type].special)} (${fn(filtered)})`:'';
+  el.innerHTML=`✅ ${xe(HOV_TYPE_LABELS[type])} loaded — <strong>${fn(all.length)}</strong> AWBs${dates.length?` · ${dates.length} date${dates.length>1?'s':''}`:''}${specTxt}`;
+  el.style.color='var(--brand)';
+}
+
+/* ── SECTION 1: HOV OVERVIEW (donut + PV/AWB table) ── */
+function renderHovTypeOverview(type){
+  const rowsD2_15=hovFilteredRows(type).filter(r=>{const a=parseInt(r.age);return a>=2&&a<=15;});
+
+  // Total
+  const tot=document.getElementById('hovOvTotal_'+type);
+  if(tot)tot.textContent=rowsD2_15.length?fn(rowsD2_15.length)+' AWBs (D2–D15)':'–';
+
+  // Donut — AWB count per Current Location
+  const byLoc={};
+  rowsD2_15.forEach(r=>{const l=r.loc||'UNKNOWN';byLoc[l]=(byLoc[l]||0)+1;});
+  const locEntries=Object.entries(byLoc).sort((a,b)=>b[1]-a[1]);
+  renderHovTypeDonut(type,locEntries.map(e=>e[0]),locEntries.map(e=>e[1]));
+
+  // PV / AWB table (desc by product value)
+  const wrap=document.getElementById('hovPVAwb_'+type);
+  if(wrap){
+    const pvRows=rowsD2_15
+      .filter(r=>r.awb)
+      .map(r=>({awb:r.awb,pv:parseFloat(r.pv)||0,loc:r.loc||'UNKNOWN'}))
+      .sort((a,b)=>b.pv-a.pv);
+    if(!pvRows.length){
+      wrap.innerHTML=`<div class="empty" style="padding:18px"><div class="et">No product-value data</div>
+        <div class="em">Upload a ${xe(HOV_TYPE_LABELS[type])} file with a Product Value column.</div></div>`;
+    }else{
+      const tblRows=pvRows.slice(0,1000).map(r=>[
+        r.awb,
+        r.pv>0?`₹${fn(Math.round(r.pv))}`:'–',
+        r.loc
+      ]);
+      const sumPV=pvRows.reduce((s,r)=>s+r.pv,0);
+      const foot=[`${fn(pvRows.length)} AWBs`,`₹${fn(Math.round(sumPV))}`,''];
+      wrap.innerHTML=pivTbl(['AWB NUMBER','PRODUCT VALUE','CURRENT LOCATION'],tblRows,foot,'320px');
+    }
+  }
+}
+
+function renderHovTypeDonut(type,labels,values){
+  const cv=document.getElementById('hovDonut_'+type);
+  if(!cv)return;
+  if(_hovTypeCharts[type]){try{_hovTypeCharts[type].destroy();}catch(_){}_hovTypeCharts[type]=null;}
+  if(!labels.length){
+    const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.font='13px Inter';ctx.fillStyle='#94a3b8';ctx.textAlign='center';
+    ctx.fillText('No data — upload a file',cv.width/2,cv.height/2);return;
+  }
+  const total=values.reduce((a,b)=>a+b,0);
+  const insideLabel={
+    id:'hovTypeLbl_'+type,
+    afterDatasetsDraw(chart){
+      const {ctx,data}=chart;const meta=chart.getDatasetMeta(0);if(!meta||!meta.data)return;
+      meta.data.forEach((arc,i)=>{
+        const val=data.datasets[0].data[i];const pct=val/total;if(pct<0.03)return;
+        const mid=(arc.startAngle+arc.endAngle)/2;
+        const r=arc.innerRadius+(arc.outerRadius-arc.innerRadius)*0.62;
+        const x=arc.x+Math.cos(mid)*r,y=arc.y+Math.sin(mid)*r;
+        const short=String(data.labels[i]||'').replace(/ DC$/i,'').slice(0,9);
+        const cstr=val>=1000?(val/1000).toFixed(1)+'K':String(val);
+        const fs=pct>=0.08?11:pct>=0.05?10:9;
+        ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.shadowColor='rgba(0,0,0,0.55)';ctx.shadowBlur=3;ctx.fillStyle='#fff';
+        ctx.font=`800 ${fs}px Inter,sans-serif`;
+        if(pct>=0.07){ctx.fillText(short,x,y-fs*0.6);ctx.fillText(cstr,x,y+fs*0.7);}
+        else{ctx.font=`800 ${Math.max(7,fs-1)}px Inter,sans-serif`;ctx.fillText(`${short}–${cstr}`,x,y);}
+        ctx.restore();
+      });
+    }
+  };
+  _hovTypeCharts[type]=new Chart(cv,{
+    type:'doughnut',
+    plugins:[insideLabel],
+    data:{labels,datasets:[{data:values,backgroundColor:HOV_PALETTE.slice(0,labels.length),borderWidth:2,borderColor:'#fff',hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'35%',layout:{padding:4},
+      plugins:{
+        title:{display:false},
+        legend:{display:true,position:'right',align:'center',
+          labels:{font:{size:9,family:'Inter',weight:'600'},padding:5,boxWidth:9,boxHeight:9,
+            generateLabels(chart){return chart.data.labels.map((l,i)=>({
+              text:`${l}: ${fn(chart.data.datasets[0].data[i])} (${total?Math.round(chart.data.datasets[0].data[i]/total*100):0}%)`,
+              fillStyle:HOV_PALETTE[i%HOV_PALETTE.length],strokeStyle:'#fff',lineWidth:1,index:i}));}}},
+        tooltip:{bodyFont:{size:11,family:'Inter'},
+          callbacks:{label(c){return` ${c.label}: ${fn(c.parsed)} AWBs (${total?Math.round(c.parsed/total*100):0}%)`;}}},
+        datalabels:{display:false}
+      }
+    }
+  });
+}
+
+/* ── SECTION 2: HOV PRODUCT VALUE TRENDS (Current Location × Ageing, sum PV) ── */
+function renderHovTypePVTrends(type){
+  const wrap=document.getElementById('hovPVTrends_'+type);
+  if(!wrap)return;
+  // Use overview-filtered rows (Location + PC + special). D2–D15 ageing window.
+  const rows=hovFilteredRows(type).filter(r=>{const a=parseInt(r.age);return a>=2&&a<=15;});
+  if(!rows.length){
+    wrap.innerHTML=`<div class="empty" style="padding:18px"><div class="et">No data</div>
+      <div class="em">Upload a ${xe(HOV_TYPE_LABELS[type])} file to view product-value trends.</div></div>`;
+    return;
+  }
+  const ages=HOV_AGES; // [2..15]
+  const locs=[...new Set(rows.map(r=>r.loc||'UNKNOWN'))].sort();
+  const grid={};locs.forEach(l=>{grid[l]={};ages.forEach(a=>grid[l][a]=0);});
+  rows.forEach(r=>{const l=r.loc||'UNKNOWN';const a=parseInt(r.age);if(grid[l]&&a>=2&&a<=15)grid[l][a]+=(parseFloat(r.pv)||0);});
+  const colTot={};ages.forEach(a=>colTot[a]=0);
+  const headers=['CURRENT LOCATION',...ages.map(a=>'D'+a),'GRAND TOTAL'];
+  const tblRows=locs.map(l=>{
+    let rowTot=0;
+    const cells=[l];
+    ages.forEach(a=>{const v=grid[l][a]||0;rowTot+=v;colTot[a]+=v;cells.push(v?`₹${fn(Math.round(v))}`:'–');});
+    cells.push(`₹${fn(Math.round(rowTot))}`);
+    return cells;
+  });
+  let grand=0;ages.forEach(a=>grand+=colTot[a]);
+  const foot=['GRAND TOTAL',...ages.map(a=>colTot[a]?`₹${fn(Math.round(colTot[a]))}`:'–'),`₹${fn(Math.round(grand))}`];
+  wrap.innerHTML=pivTbl(headers,tblRows,foot,'420px');
+}
+
+/* ── SECTION 3: D15+ TRACKER ──
+   (a) Existing-style per-AWB list of shipments aged > 15
+   (b) NEW pivot: Current Location × Age (D16–D90), count of AWBs, grand totals */
+function renderHovTypeD15(type){
+  const rows=hovFilteredRows(type);
+
+  // (a) D15+ AWB list (age > 15)
+  const listWrap=document.getElementById('hovD15List_'+type);
+  if(listWrap){
+    const over=rows.filter(r=>{const a=parseInt(r.age);return a>15;})
+      .map(r=>({awb:r.awb||'–',loc:r.loc||'UNKNOWN',pc:r.pc||'–',pv:parseFloat(r.pv)||0,age:parseInt(r.age)||0}))
+      .sort((a,b)=>b.age-a.age||b.pv-a.pv);
+    if(!over.length){
+      listWrap.innerHTML=`<div class="empty" style="padding:16px"><div class="et">No D15+ shipments</div>
+        <div class="em">No ${xe(HOV_TYPE_LABELS[type])} AWBs aged beyond D15 for the current filters.</div></div>`;
+    }else{
+      const tbl=over.slice(0,1000).map(r=>[`D${r.age}`,r.awb,r.loc,r.pc,r.pv>0?`₹${fn(Math.round(r.pv))}`:'–']);
+      const sumPV=over.reduce((s,r)=>s+r.pv,0);
+      const foot=[`${fn(over.length)} AWBs`,'','','',`₹${fn(Math.round(sumPV))}`];
+      listWrap.innerHTML=`<div style="font-size:11px;font-weight:800;color:var(--tx2);text-transform:uppercase;margin-bottom:6px">D15+ Shipments (Age &gt; D15)</div>`
+        +pivTbl(['AGE','AWB NUMBER','CURRENT LOCATION','PRODUCT CATEGORY','PRODUCT VALUE'],tbl,foot,'300px');
+    }
+  }
+
+  // (b) D16–D90 ageing pivot (count of AWBs)
+  renderHovD15Pivot(type,rows);
+}
+
+/* D16–D90 pivot — Current Location rows × Age columns, AWB counts. */
+function renderHovD15Pivot(type,rows){
+  const wrap=document.getElementById('hovD15Pivot_'+type);
+  if(!wrap)return;
+  const D15_AGES=[];for(let a=16;a<=90;a++)D15_AGES.push(a);
+  const inRange=rows.filter(r=>{const a=parseInt(r.age);return a>=16&&a<=90;});
+  if(!inRange.length){
+    wrap.innerHTML=`<div class="empty" style="padding:16px"><div class="et">No D16–D90 shipments</div>
+      <div class="em">No pending ${xe(HOV_TYPE_LABELS[type])} shipments aged D16–D90 for the current filters.</div></div>`;
+    return;
+  }
+  // Only render age columns that actually have data (keeps the wide table readable)
+  const presentAges=D15_AGES.filter(a=>inRange.some(r=>parseInt(r.age)===a));
+  const locs=[...new Set(inRange.map(r=>r.loc||'UNKNOWN'))].sort();
+  const grid={};locs.forEach(l=>{grid[l]={};presentAges.forEach(a=>grid[l][a]=0);});
+  const colTot={};presentAges.forEach(a=>colTot[a]=0);
+  inRange.forEach(r=>{const l=r.loc||'UNKNOWN';const a=parseInt(r.age);if(grid[l]&&grid[l][a]!==undefined){grid[l][a]++;colTot[a]++;}});
+
+  // Build a styled Excel-pivot table with sticky first column + grand totals
+  let grand=0;presentAges.forEach(a=>grand+=colTot[a]);
+  let html=`<div style="overflow-x:auto;border:1px solid #c8dfd9;border-radius:6px">
+    <table style="border-collapse:collapse;width:100%;font-size:12px;font-family:Inter,sans-serif;min-width:${120+presentAges.length*54+70}px">
+    <thead><tr>
+      <th style="background:#0f2b25;color:#fff;padding:9px 12px;text-align:left;font-weight:900;position:sticky;left:0;z-index:2;border-right:1px solid #1a5045;white-space:nowrap">CURRENT LOCATION</th>`;
+  presentAges.forEach(a=>{html+=`<th style="background:#0f2b25;color:#fff;padding:9px 8px;text-align:center;font-weight:900;border-right:1px solid #1a5045;white-space:nowrap">D${a}</th>`;});
+  html+=`<th style="background:#0a2520;color:#E9DF43;padding:9px 12px;text-align:center;font-weight:900;white-space:nowrap">GRAND TOTAL</th></tr></thead><tbody>`;
+  locs.forEach((l,ri)=>{
+    const bg=ri%2===0?'#fff':'#f3faf7';
+    let rowTot=0;
+    html+=`<tr><td style="background:${bg};padding:8px 12px;text-align:left;font-weight:800;border-bottom:1.5px solid #c8dfd9;border-right:1px solid #daeee9;position:sticky;left:0;z-index:1;white-space:nowrap">${xe(l)}</td>`;
+    presentAges.forEach(a=>{
+      const v=grid[l][a]||0;rowTot+=v;
+      html+=`<td style="background:${v?bg:'#fafafa'};padding:8px;text-align:center;font-weight:${v?'700':'400'};color:${v?'#0a2520':'#cbd5e1'};border-bottom:1.5px solid #c8dfd9;border-right:1px solid #daeee9">${v||'–'}</td>`;
+    });
+    html+=`<td style="background:#dff0ea;padding:8px 12px;text-align:center;font-weight:900;color:#0a4a35;border-bottom:1.5px solid #c8dfd9">${fn(rowTot)}</td></tr>`;
+  });
+  html+=`<tr><th style="background:#0a2520;color:#fff;padding:9px 12px;text-align:left;font-weight:900;position:sticky;left:0;z-index:1;border-right:1px solid #1a5045">GRAND TOTAL</th>`;
+  presentAges.forEach(a=>{html+=`<th style="background:#0a2520;color:#fff;padding:9px 8px;text-align:center;font-weight:900;border-right:1px solid #1a5045">${fn(colTot[a])}</th>`;});
+  html+=`<th style="background:#E9DF43;color:#0a2520;padding:9px 12px;text-align:center;font-weight:900">${fn(grand)}</th></tr>`;
+  html+=`</tbody></table></div>`;
+  wrap.innerHTML=html;
+}
+
+/* ── Per-tab upload (forces the tab's own file type) ── */
+async function runHovTypeFile(type,file){
+  if(!file)return;
+  setHovP(true,`⚙  Reading ${HOV_TYPE_LABELS[type]} file…`);
+  const date=xDate(file.name);
+  try{
+    await procHovFile(file,type,date);
+    const badge=document.getElementById('hovBadge_'+type);
+    if(badge){badge.innerHTML=`✅ Processed <strong>${xe(file.name.slice(0,40))}</strong>`;badge.style.color='var(--brand)';}
+    toast(`🚁 ${HOV_TYPE_LABELS[type]} file processed`,'tok');
+  }catch(e){
+    console.warn('runHovTypeFile:',e);
+    toast(`❌ Could not process ${HOV_TYPE_LABELS[type]} file: ${e.message}`,'te');
+  }
+  setHovP(false);
+  renderHovType(type);
+}
+
+/* ── Clear a single file type ── */
+function onHovClearType(type){
+  if(!requireAdmin('Clear HOV Data'))return;
+  if(!confirm(`Clear all ${HOV_TYPE_LABELS[type]} HOV data?\n\nOther tabs are not affected.`))return;
+  const drop=r=>r.fileType!==type;
+  if(master.hovAllRaw)master.hovAllRaw=master.hovAllRaw.filter(drop);
+  if(master.hovPV)master.hovPV=master.hovPV.filter(drop);
+  if(master.hov)master.hov=master.hov.filter(drop);
+  if(type==='forward'&&master.hovFwdRaw)master.hovFwdRaw=[];
+  if(type==='reverse'&&master.hovRevRaw)master.hovRevRaw=[];
+  try{persistM();}catch(_){}
+  _hovTypeFilter[type]={special:'ALL',loc:'ALL',pc:'ALL'};
+  renderHovType(type);
+  toast(`🗑 ${HOV_TYPE_LABELS[type]} HOV data cleared`,'tok');
+}
+
+/* ── Wire per-tab file inputs (delegated; survives panel rebuilds) ── */
+(function wireHovTypeInputs(){
+  document.addEventListener('change',function(e){
+    const t=e.target;
+    if(!t||!t.id||t.id.indexOf('hovFile_')!==0)return;
+    const type=t.id.slice('hovFile_'.length);
+    if(!HOV_TYPE_LABELS[type])return;
+    if(!requireAdmin('Upload HOV Files')){t.value='';return;}
+    const file=t.files&&t.files[0];t.value='';
+    if(file)runHovTypeFile(type,file);
+  });
+})();
 
 /* ── Bar chart render (Fix 4) ── */
 function renderHovBar(canvasId,labels,values){
@@ -7504,12 +7754,15 @@ function onHovClear(){
 }
 
 /* HOV file input */
-document.getElementById('hovFi').addEventListener('change',async e=>{
-  if(!requireAdmin('Upload HOV Files')){e.target.value='';return;}
-  const files=Array.from(e.target.files);e.target.value='';
-  if(!files.length)return;
-  await runHovFiles(files);
-});
+(function(){
+  const _hovFiEl=document.getElementById('hovFi');
+  if(_hovFiEl)_hovFiEl.addEventListener('change',async e=>{
+    if(!requireAdmin('Upload HOV Files')){e.target.value='';return;}
+    const files=Array.from(e.target.files);e.target.value='';
+    if(!files.length)return;
+    await runHovFiles(files);
+  });
+})();
 
 /* ═══════════════════════════════════════════════
    SECTION EXCEL REPORT DOWNLOAD
@@ -10193,9 +10446,9 @@ const ADMIN_BTN_SELECTORS=[
   '#tbar button[onclick*="Import"]', // Import Backup
   '#tbar .btn.bd',       // Debug, AS Code, Sheets
   '#tbar .btn.br',       // Clear All
-  '#hovTbar .btn.bp',    // Upload HOV Files
-  '#hovTbar .btn.bk',    // Save HOV Data
-  '#hovTbar .btn.br',    // Clear HOV Data
+  '#hovSection .hov-type-panel .btn.bp', // per-tab Upload File
+  '#hovSection .hov-type-panel .btn.bk', // per-tab Save HOV Data
+  '#hovSection .hov-type-panel .btn.br', // per-tab Clear
 ];
 
 /* ── Enter VIEW MODE — no login required ── */
