@@ -742,9 +742,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100
           </div>
           <span id="tgtRevStatus" style="font-size:11px;color:var(--tx3)">No reverse file uploaded.</span>
         </div>
+        <!-- Target Master upload (single source of truth) -->
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:11px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.4px">🎯 Target Master File</span>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+            <input type="file" id="tgtMasterFile" accept=".xlsx,.xls" style="display:none">
+            <button class="btn bk" onclick="document.getElementById('tgtMasterFile').click()">📥 Upload Target File</button>
+          </div>
+          <span id="tgtMasterStatus" style="font-size:11px;color:#b45309">No target master loaded.</span>
+        </div>
         <div style="flex:1"></div>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-          <button class="btn bg" onclick="downloadTargetReportImage()" style="font-size:10px;padding:4px 10px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 Export PNG</button>
+          <button class="btn bg" onclick="downloadTargetReportImage()" style="font-size:10px;padding:4px 10px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 Download Full Image</button>
           <span id="tgtHistStatus" style="font-size:10px;color:var(--tx3);font-style:italic">Historical data: loading…</span>
         </div>
       </div>
@@ -5142,45 +5151,24 @@ const TGT_REPORTS=[
   {key:'rev10', sheet:'D10 REV R@DC', src:'reverse', age:10, elId:'tgtReport_rev10'}
 ];
 
-/* Site-wise targets per report (seeded from the reference image).
-   Keys are canonical location names (upper-cased, trimmed). Update freely —
-   any site not listed defaults to target 0.                                */
-const TGT_TARGETS={
-  fwd6:{
-    'ONENCR DC':54,'AHMEDABAD DC':24,'BANGALORE DC':17,'MUMBAI DC':10,'SURAT DC':19,
-    'JAIPUR DC':12,'NCR BILASPUR DC':10,'NCR BAMNOLI DC':3,'NAGPUR DC':5,'KOLKATA DC':4,
-    'LUCKNOW DC':6,'PATNA DC':2,'BHOPAL DC':0,'CHENNAI DC':0,'RAIPUR DC':2,'KOLKATA 2 DC':1,
-    'PUNE DC':2,'HYDERABAD DC':9,'HUBLI DC':1,'MADURAI DC':0,'INDORE DC':1,'KOCHI DC':1,
-    'VISAKHAPATNAM DC':1,'CCU_LARGE DC':0,'NCR TAURU DC':0,'BHUBNESHWAR DC':0,'VARANASI DC':0,
-    'GUWAHATI DC':1,'KANPUR DC':0,'SILIGURI DC':0,'COIMBATORE DC':0,'TRICHY DC':0,'RANCHI DC':0,
-    'UDAIPUR DC':1,'PURNIA DC':0,'BANGALORE XD DC':0,'SRINAGAR DC':14,'MYSORE DC':0,'SAGAR DC':0,
-    'KOZHIKODE DC':0,'NCR_BAMNOLI_LARGE DC':0,'LUDHIANA DC':0,'BLR_LARGE DC':0,'BOM_LARGE DC':0,
-    'DIBRUGARH DC':0,'JAMMU DC':0,'AURANGABAD DC':0
-  },
-  rev6:{
-    'ONENCR DC':70,'BANGALORE DC':68,'MUMBAI DC':26,'AHMEDABAD DC':50,'JAIPUR DC':26,
-    'SURAT DC':24,'HYDERABAD DC':27,'NCR TAURU DC':23,'NAGPUR DC':12,'CHENNAI DC':2,
-    'LUCKNOW DC':15,'KOLKATA 2 DC':11,'PATNA DC':10,'NCR BAMNOLI DC':4,'KOLKATA DC':3,
-    'NCR BILASPUR DC':4,'VIJAYAWADA DC':1,'BHOPAL DC':1,'INDORE DC':5,'RAIPUR DC':1,
-    'KOCHI DC':6,'COIMBATORE DC':5,'PUNE DC':1,'MADURAI DC':1,'LUDHIANA DC':1,
-    'VISAKHAPATNAM DC':0,'BHUBNESHWAR DC':0,'GUWAHATI DC':1,'CCU_LARGE DC':1,'HUBLI DC':1,
-    'NCR_TAURU_LARGE DC':0,'KOZHIKODE DC':0,'TRICHY DC':0,'VARANASI DC':0,'NCR_BAMNOLI_LARGE DC':0,
-    'UDAIPUR DC':0,'CHANDIGARH DC':0,'KANPUR DC':0,'SILIGURI DC':1,'GORAKHPUR DC':0,
-    'SAGAR DC':0,'RANCHI DC':0
-  },
-  rev10:{
-    'ONENCR DC':59,'BANGALORE DC':46,'AHMEDABAD DC':36,'MUMBAI DC':18,'JAIPUR DC':23,
-    'NCR TAURU DC':22,'NAGPUR DC':9,'SURAT DC':21,'LUCKNOW DC':11,'HYDERABAD DC':15,
-    'KOLKATA 2 DC':7,'CHENNAI DC':1,'PATNA DC':7,'KOLKATA DC':3,'NCR BAMNOLI DC':2,
-    'NCR BILASPUR DC':3,'BHOPAL DC':0,'INDORE DC':2,'VIJAYAWADA DC':0,'COIMBATORE DC':3,
-    'MADURAI DC':0,'LUDHIANA DC':0,'RAIPUR DC':1,'KOCHI DC':4,'BHUBNESHWAR DC':0,
-    'GUWAHATI DC':0,'VISAKHAPATNAM DC':1,'CCU_LARGE DC':2,'PUNE DC':0,'HUBLI DC':0,
-    'SILIGURI DC':1,'KOZHIKODE DC':0,'NCR_TAURU_LARGE DC':0,'KANPUR DC':0,'VARANASI DC':0,
-    'SAGAR DC':0,'RANCHI DC':0,'PURNIA DC':0,'BANGALORE XD DC':0,'BOM_LARGE DC':0,
-    'NCR_BAMNOLI_LARGE DC':0,'BLR_LARGE DC':0,'UDAIPUR DC':0,'BANGALORE REV DC':0,
-    'JAMMU DC':0,'AURANGABAD DC':0
-  }
-};
+/* Site-wise targets per report — SINGLE SOURCE OF TRUTH is the official
+   Target Master file uploaded by the admin (see loadTargetMasterFile()).
+   Structure after load: { fwd6:{CANON_LOC:target}, rev6:{…}, rev10:{…} }.
+   Starts empty; any site not present defaults to target 0. Persisted in
+   localStorage so the latest uploaded target file survives reloads.        */
+let TGT_TARGETS={fwd6:{},rev6:{},rev10:{}};
+const TGT_MASTER_LS_KEY='logistics_target_master_v1';
+
+/* Load persisted target master (if a file was uploaded previously). */
+(function _tgtLoadPersistedTargets(){
+  try{
+    const raw=localStorage.getItem(TGT_MASTER_LS_KEY);
+    if(raw){
+      const obj=JSON.parse(raw);
+      if(obj&&obj.targets)TGT_TARGETS={fwd6:obj.targets.fwd6||{},rev6:obj.targets.rev6||{},rev10:obj.targets.rev10||{}};
+    }
+  }catch(_){}
+})();
 
 /* Module state:
    _tgtHist[key] = { location: { date: count } }  — historical + committed
@@ -5199,8 +5187,11 @@ function _tgtRegisterName(name){
   if(k&&!_tgtDisplayNames[k])_tgtDisplayNames[k]=String(name).trim();
   return k;
 }
-// Seed from the target list (correct canonical spellings from the reference).
-Object.values(TGT_TARGETS).forEach(m=>Object.keys(m).forEach(n=>_tgtRegisterName(n)));
+// Seed display names from any persisted target list (correct spellings).
+function _tgtSeedNamesFromTargets(){
+  Object.values(TGT_TARGETS).forEach(m=>Object.keys(m).forEach(n=>_tgtRegisterName(n)));
+}
+_tgtSeedNamesFromTargets();
 
 function _tgtProg(show,txt){
   const p=document.getElementById('tgtProg');if(p)p.style.display=show?'block':'none';
@@ -5215,18 +5206,123 @@ function tgtLocKey(s){return String(s||'').toUpperCase().replace(/\s+/g,' ').tri
 async function initTargetReport(){
   if(!_tgtInit){
     _tgtInit=true;
-    // wire the two file inputs
+    // wire the two count-file inputs
     const fwd=document.getElementById('tgtFwdFile');
     if(fwd)fwd.addEventListener('change',e=>_onTargetFile('forward',e));
     const rev=document.getElementById('tgtRevFile');
     if(rev)rev.addEventListener('change',e=>_onTargetFile('reverse',e));
+    // wire the Target Master file input
+    const tm=document.getElementById('tgtMasterFile');
+    if(tm)tm.addEventListener('change',_onTargetMasterFile);
   }
   applyRoleUI();
+  _tgtUpdateMasterStatus();
   if(!_tgtHistLoaded){
     await loadTargetHistory();
   }
   renderAllTargetReports();
 }
+
+/* Update the target-master status line. */
+function _tgtUpdateMasterStatus(){
+  const el=document.getElementById('tgtMasterStatus');
+  if(!el)return;
+  const n=new Set([...Object.keys(TGT_TARGETS.fwd6||{}),...Object.keys(TGT_TARGETS.rev6||{}),...Object.keys(TGT_TARGETS.rev10||{})]).size;
+  if(!n){el.textContent='No target master loaded — upload the official Target file.';el.style.color='#b45309';return;}
+  let meta='';
+  try{const raw=localStorage.getItem(TGT_MASTER_LS_KEY);if(raw){const o=JSON.parse(raw);if(o&&o.file)meta=` · ${o.file}`;}}catch(_){}
+  el.textContent=`✅ Target master loaded — ${n} sites${meta}`;el.style.color='var(--brand)';
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   TARGET MASTER FILE — single source of truth for all target values.
+   Expected columns: SITE NAME | D6 FWD TARGETS | D10 RVP TARGETS | D6 RVP TARGETS
+   (header names matched flexibly; a "Grand Total" row is ignored — the
+   report's Grand Total is re-aggregated from the site values).
+════════════════════════════════════════════════════════════════════════ */
+async function _onTargetMasterFile(ev){
+  if(!requireAdmin('Upload Target Master file')){ev.target.value='';return;}
+  const file=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  await loadTargetMasterFile(file);
+}
+
+async function loadTargetMasterFile(file){
+  const st=document.getElementById('tgtMasterStatus');
+  _tgtProg(true,`Reading target master ${file.name}…`);
+  try{
+    const ext=(file.name.split('.').pop()||'').toLowerCase();
+    if(ext!=='xlsx'&&ext!=='xls'){
+      if(st){st.textContent='❌ Please upload an Excel (.xlsx) target file.';st.style.color='#b91c1c';}
+      _tgtProg(false);return;
+    }
+    const buf=await file.arrayBuffer();
+    let result=null;
+    if(typeof readExcelNative==='function'&&typeof pako!=='undefined'){
+      try{result=await readExcelNative(buf,file.name);}catch(_){}
+    }
+    if(!result||!result.rows||result.rows.length<2)result=readExcel(buf,null);
+    if(!result||!result.rows||result.rows.length<2){
+      if(st){st.textContent='❌ Could not read the target file.';st.style.color='#b91c1c';}
+      _tgtProg(false);return;
+    }
+    const parsed=_tgtParseMaster(result.rows);
+    if(!parsed.count){
+      if(st){st.textContent='❌ No target rows found. Expected columns: SITE NAME, D6 FWD TARGETS, D10 RVP TARGETS, D6 RVP TARGETS.';st.style.color='#b91c1c';}
+      _tgtProg(false);return;
+    }
+    TGT_TARGETS=parsed.targets;
+    _tgtSeedNamesFromTargets();
+    // Persist as the latest target master
+    try{localStorage.setItem(TGT_MASTER_LS_KEY,JSON.stringify({targets:TGT_TARGETS,file:file.name,ts:new Date().toISOString()}));}catch(_){}
+    _tgtUpdateMasterStatus();
+    renderAllTargetReports();
+    _tgtProg(false);
+    toast(`🎯 Target master loaded — ${parsed.count} sites`,'tok');
+  }catch(e){
+    console.error('[target] loadTargetMasterFile:',e);
+    if(st){st.textContent='❌ Error: '+e.message;st.style.color='#b91c1c';}
+    _tgtProg(false);
+  }
+}
+
+/* Parse the Target Master raw rows → {targets:{fwd6,rev6,rev10}, count}. */
+function _tgtParseMaster(raw){
+  // Find the header row (contains "SITE NAME" or "TARGET")
+  let hi=-1;
+  for(let i=0;i<Math.min(15,raw.length);i++){
+    const joined=(raw[i]||[]).map(c=>String(c||'').toUpperCase()).join(' ');
+    if(joined.includes('SITE')||joined.includes('TARGET')||joined.includes('LOCATION')){hi=i;break;}
+  }
+  if(hi<0)hi=0;
+  const hdr=(raw[hi]||[]).map(c=>String(c||'').toUpperCase().replace(/\s+/g,' ').trim());
+  // Locate columns flexibly
+  const findCol=(...keys)=>{
+    for(let c=0;c<hdr.length;c++){const h=hdr[c];if(keys.every(k=>h.includes(k)))return c;}
+    return -1;
+  };
+  let cSite=findCol('SITE');if(cSite<0)cSite=findCol('LOCATION');if(cSite<0)cSite=0;
+  const cFwd6 =findCol('D6','FWD');
+  const cRev10=findCol('D10','RVP');
+  const cRev6 =findCol('D6','RVP');
+  const targets={fwd6:{},rev6:{},rev10:{}};
+  const num=v=>{const n=parseFloat(String(v??'').replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n;};
+  let count=0;
+  for(let r=hi+1;r<raw.length;r++){
+    const row=raw[r];if(!row)continue;
+    const nameRaw=String(row[cSite]??'').trim();
+    if(!nameRaw)continue;
+    if(/grand\s*total|^total$/i.test(nameRaw))continue; // ignore grand-total row
+    const k=_tgtRegisterName(nameRaw);
+    if(cFwd6 >=0)targets.fwd6[k] =num(row[cFwd6]);
+    if(cRev6 >=0)targets.rev6[k] =num(row[cRev6]);
+    if(cRev10>=0)targets.rev10[k]=num(row[cRev10]);
+    count++;
+  }
+  return{targets,count};
+}
+
 
 /* ── Load historical data from the dedicated Google Sheet (public gviz read) ──
    Each report tab is a location × date pivot. First column = Current Location,
@@ -5576,18 +5672,20 @@ function renderTargetReport(rep){
     return;
   }
 
-  // Build rows.
+  // Build rows. Targets come from the official Target Master file (rounded
+  // for display and for all target-based calculations).
   const rows=[...locSet].map(loc=>{
     const m=store[loc]||{};
     const today=currentDate?(m[currentDate]||0):0;
     const avg=_tgtRollingAvg(m,recentDates);
-    const target=targets[loc]!==undefined?targets[loc]:0;
+    const rawTarget=targets[loc]!==undefined?targets[loc]:0;
+    const target=Math.round(rawTarget);
     return{loc,today,avg,target};
   });
   // Sort by rolling average descending (spec §8).
   rows.sort((a,b)=>b.avg-a.avg||b.today-a.today);
 
-  // Grand totals.
+  // Grand totals — true aggregation of the corrected site-level values.
   const gToday=rows.reduce((s,r)=>s+r.today,0);
   const gAvg=rows.reduce((s,r)=>s+r.avg,0);
   const gTarget=rows.reduce((s,r)=>s+r.target,0);
@@ -5596,9 +5694,9 @@ function renderTargetReport(rep){
   const maxAvg=Math.max(1,...rows.map(r=>r.avg));
 
   const dateLabel=currentDate?_tgtFmtDateLabel(currentDate):'Count';
-  let html=`<div style="max-height:640px;overflow:auto"><table class="tgt-table">
+  let html=`<div class="tgt-scroll" style="max-height:640px;overflow:auto"><table class="tgt-table">
     <thead><tr>
-      <th class="tgt-rowlabel">${xe(rep.src==='reverse'&&rep.key==='rev10'?'DC':'Row Labels')}</th>
+      <th class="tgt-rowlabel">Current Location</th>
       <th>${xe(dateLabel)}</th><th>AVERAGE</th><th>TARGETS</th><th>TARGET COMPLETION %</th>
     </tr></thead><tbody>`;
   // Grand Total row (styled yellow like reference).
@@ -5671,20 +5769,71 @@ function _tgtCompletionColor(pct){
   return`rgb(${r},${g},${b})`;
 }
 
-/* Export the three reports as a PNG (reuses html2canvas if present). */
+/* ════════════════════════════════════════════════════════════════════════
+   FULL-REPORT IMAGE EXPORT (high resolution)
+   Builds an off-screen clone of the three reports with ALL scroll/height
+   clipping removed, so html2canvas renders every row and column — not just
+   the visible viewport. Rendered at scale 3 (~300 DPI) with borders, colours,
+   conditional formatting, fonts, alignment and spacing preserved.
+════════════════════════════════════════════════════════════════════════ */
 async function downloadTargetReportImage(){
-  const node=document.getElementById('tgtReports');
-  if(!node)return;
+  const src=document.getElementById('tgtReports');
+  if(!src)return;
   if(typeof html2canvas==='undefined'){
-    toast('PNG export unavailable (html2canvas not loaded).','tw');return;
+    toast('Image export unavailable (renderer not loaded).','tw');return;
   }
+  _tgtProg(true,'Rendering full report image…');
+
+  // Build an off-screen container holding a clone with no clipping.
+  const stage=document.createElement('div');
+  stage.style.cssText='position:fixed;left:-100000px;top:0;z-index:-1;background:#ffffff;padding:16px;'+
+    'display:inline-block;width:max-content';
+  const clone=src.cloneNode(true);
+  // Force the 3-column grid to its natural full width and remove any height caps.
+  clone.style.width='max-content';
+  clone.style.display='grid';
+  clone.style.gridTemplateColumns='repeat(3, max-content)';
+  clone.style.gap='14px';
+  // Remove scroll wrappers' clipping so ALL rows render.
+  clone.querySelectorAll('.tgt-scroll').forEach(el=>{
+    el.style.maxHeight='none';el.style.overflow='visible';el.style.height='auto';
+  });
+  clone.querySelectorAll('*').forEach(el=>{
+    const cs=el.style;
+    if(cs){cs.maxHeight='none';if(cs.overflow==='auto'||cs.overflow==='scroll')cs.overflow='visible';}
+  });
+  stage.appendChild(clone);
+  document.body.appendChild(stage);
+
   try{
-    const canvas=await html2canvas(node,{scale:2,backgroundColor:'#ffffff'});
+    // Let layout settle.
+    await new Promise(r=>setTimeout(r,60));
+    const w=Math.max(stage.scrollWidth,clone.scrollWidth,stage.offsetWidth);
+    const h=Math.max(stage.scrollHeight,clone.scrollHeight,stage.offsetHeight);
+    const canvas=await html2canvas(clone,{
+      scale:3,                    // ~300 DPI at typical CSS sizes
+      backgroundColor:'#ffffff',
+      useCORS:true,
+      logging:false,
+      scrollX:0,scrollY:0,
+      windowWidth:w+64,
+      windowHeight:h+64,
+      width:w,
+      height:h
+    });
     const a=document.createElement('a');
-    a.href=canvas.toDataURL('image/png');
-    a.download='Target_Achieved_Report.png';
+    a.href=canvas.toDataURL('image/png',1.0);
+    const stamp=new Date().toISOString().slice(0,10);
+    a.download=`Target_Achieved_Report_${stamp}.png`;
     a.click();
-  }catch(e){toast('PNG export failed: '+e.message,'te');}
+    toast('🖼 Full report image downloaded','tok');
+  }catch(e){
+    console.error('[target] image export:',e);
+    toast('Image export failed: '+e.message,'te');
+  }finally{
+    document.body.removeChild(stage);
+    _tgtProg(false);
+  }
 }
 
 /* renderHovTab — entry point for the redesigned 4-tab HOV Tracker.
@@ -8937,7 +9086,7 @@ const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rYQ';
    The dashboard auto-discovers this from the spreadsheet's __url__ sentinel row.
    You can also paste it here permanently after deploying a new version.
    Current deployment URL (update this when you redeploy):                    */
-const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbzGYRPdy8JAkGWmLRtjBFF8Q5aLBFZMvlkLNMh7GbJY93fvMACLf0vhiIqeRGDmJI5J/exec';
+const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbxH5gZDKpkLQtlRQKHsHn74wxECet3tv0GMjK95rGnvRBaUi6kodSUZS3d5PFmU7Hf8/exec';
 
 const GS_BOOTSTRAP_URLS=[
   `https://docs.google.com/spreadsheets/d/${GS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=MASTER+SNAPSHOT_1`,
@@ -11088,6 +11237,7 @@ const ADMIN_BTN_SELECTORS=[
   '#hovSection .hov-type-panel .btn.br', // per-tab Clear
   '#targetSection .btn.bp',   // Target: Upload Forward/Reverse
   '#targetSection .btn.br',   // Target: Remove Upload
+  '#targetSection .btn.bk',   // Target: Upload Target Master
 ];
 
 /* ── Enter VIEW MODE — no login required ── */
