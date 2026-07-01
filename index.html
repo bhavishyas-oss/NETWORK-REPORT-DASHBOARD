@@ -5151,6 +5151,11 @@ const TGT_REPORTS=[
   {key:'rev10', sheet:'D10 REV R@DC', src:'reverse', age:10, elId:'tgtReport_rev10'}
 ];
 
+/* Fixed, predefined overall Grand Total TARGET per report (NOT the sum of
+   site targets). These are official constants and always appear in the
+   Grand Total row:  D6 FWD R@DC = 200 · D6 REV R@DC = 400 · D10 REV R@DC = 300 */
+const TGT_GRAND_TARGET={fwd6:200,rev6:400,rev10:300};
+
 /* Site-wise targets per report — SINGLE SOURCE OF TRUTH is the official
    Target Master file uploaded by the admin (see loadTargetMasterFile()).
    Structure after load: { fwd6:{CANON_LOC:target}, rev6:{…}, rev10:{…} }.
@@ -5523,11 +5528,22 @@ function _tgtCommitPending(src){
   });
 }
 
+/* An ECOM DATA cell that equals #N/A (any casing / spacing) excludes the row
+   from ALL Target-report calculations. Blank ECOM DATA is NOT excluded. */
+function _tgtEcomExcluded(row){
+  const raw=gv(row,'ecom data','ECOM DATA','ecom_data','ECOM_DATA','ecomdata','EcomData');
+  if(raw==='')return false; // blank is kept
+  const v=String(raw).trim().toUpperCase().replace(/[\s_]/g,'');
+  return v==='#N/A'||v==='N/A'||v==='#NA'||v==='NA';
+}
+
 /* FORWARD: Pivot = RECEIVED_AT_DC; age from Ageing_from_Bag_Rec ONLY; age===6. */
 function _extractForwardCounts(rows){
   const counts={};
   for(const row of rows){
     if(!row||!Object.values(row).some(v=>String(v).trim()))continue;
+    // ── ECOM DATA filter (applied BEFORE any other calculation) ──
+    if(_tgtEcomExcluded(row))continue;
     const pivot=nv(gv(row,'pivot','Pivot','PIVOT'));
     if(pivot!=='RECEIVED_AT_DC')continue;
     // AGE — ONLY Ageing_from_Bag_Rec (no fallback, no derived age)
@@ -5547,6 +5563,8 @@ function _extractReverseCounts(rows,targetAge){
   const counts={};
   for(const row of rows){
     if(!row||!Object.values(row).some(v=>String(v).trim()))continue;
+    // ── ECOM DATA filter (applied BEFORE any other calculation) ──
+    if(_tgtEcomExcluded(row))continue;
     const reason=nv(gv(row,'reason of loss','Reason of Loss','reason_of_loss','Reason_of_Loss','Reason Of Loss','reasonofloss','REASON OF LOSS'));
     if(reason!=='RECEIVED_AT_DC'&&reason!=='MISROUTED')continue;
     // AGE — ONLY the Ageing column (no alternate, no derived)
@@ -5685,10 +5703,12 @@ function renderTargetReport(rep){
   // Sort by rolling average descending (spec §8).
   rows.sort((a,b)=>b.avg-a.avg||b.today-a.today);
 
-  // Grand totals — true aggregation of the corrected site-level values.
+  // Grand totals — counts/averages aggregate the site rows, but the
+  // Grand Total TARGET uses the fixed predefined overall target per report
+  // (NOT the sum of site targets), per spec.
   const gToday=rows.reduce((s,r)=>s+r.today,0);
   const gAvg=rows.reduce((s,r)=>s+r.avg,0);
-  const gTarget=rows.reduce((s,r)=>s+r.target,0);
+  const gTarget=TGT_GRAND_TARGET[rep.key]!==undefined?TGT_GRAND_TARGET[rep.key]:0;
 
   // AVERAGE heat scale (red gradient — highest avg = strongest red).
   const maxAvg=Math.max(1,...rows.map(r=>r.avg));
@@ -9086,7 +9106,7 @@ const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rYQ';
    The dashboard auto-discovers this from the spreadsheet's __url__ sentinel row.
    You can also paste it here permanently after deploying a new version.
    Current deployment URL (update this when you redeploy):                    */
-const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbxH5gZDKpkLQtlRQKHsHn74wxECet3tv0GMjK95rGnvRBaUi6kodSUZS3d5PFmU7Hf8/exec';
+const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbzp1KCR4UCb0myBXRQrIvetVP7D1HngFlDtp9BwGFpny-Qfn6KS6qO9oWO94nui6LAi/exec';
 
 const GS_BOOTSTRAP_URLS=[
   `https://docs.google.com/spreadsheets/d/${GS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=MASTER+SNAPSHOT_1`,
