@@ -367,6 +367,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100
   text-transform:uppercase;letter-spacing:1px}
 .report-placeholder .rp-sub{font-size:13px;color:var(--tx3);margin-top:10px;max-width:440px;line-height:1.6}
 
+/* ═══ TARGET ACHIEVED % REPORT ═══ */
+.tgt-report-col{display:flex;flex-direction:column;overflow:hidden;border:1px solid #cbd5e1;border-radius:6px;background:#fff}
+.tgt-report-title{padding:8px 10px;font-size:12px;font-weight:900;color:#1e293b;text-align:center;
+  text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #cbd5e1}
+.tgt-table{border-collapse:collapse;width:100%;font-size:11px;font-family:Inter,sans-serif}
+.tgt-table th{background:#fff200;color:#1e293b;padding:5px 6px;font-weight:800;font-size:10.5px;
+  text-align:center;border:1px solid #d4d400;white-space:nowrap;text-transform:uppercase}
+.tgt-table th.tgt-rowlabel{text-align:left}
+.tgt-table td{padding:4px 7px;border:1px solid #e2e8f0;font-weight:600;color:#1e293b;text-align:center;white-space:nowrap}
+.tgt-table td.tgt-loc{text-align:left;font-weight:600}
+.tgt-table tr.tgt-grand td{background:#fff200;font-weight:900;border:1px solid #d4d400}
+.tgt-table tr.tgt-grand td.tgt-loc{text-align:left}
+.tgt-zero{color:#166534;font-weight:700;font-size:10px}
+
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}</style>
@@ -703,12 +717,62 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100
 
 <!-- ═══ TARGET ACHIEVED % REPORT — Independent Page ═══ -->
 <div id="targetSection" class="page-section">
-  <div class="report-placeholder">
-    <div class="rp-ico">🎯</div>
-    <div class="rp-title">Target Achieved % Report</div>
-    <div class="rp-sub">This page is reserved for the Target Achieved % Report. Reporting content will be added here.</div>
+  <div id="tgtWrap" style="padding:14px 16px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- Upload toolbar -->
+    <div class="card">
+      <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start">
+        <!-- Forward upload -->
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.4px">📦 Forward File</span>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+            <input type="file" id="tgtFwdFile" accept=".xlsx,.xls" style="display:none">
+            <button class="btn bp" onclick="document.getElementById('tgtFwdFile').click()">📂 Upload Forward File</button>
+            <button class="btn br" id="tgtFwdRemoveBtn" onclick="removeTargetUpload('forward')" style="display:none">↩ Remove Upload</button>
+          </div>
+          <span id="tgtFwdStatus" style="font-size:11px;color:var(--tx3)">No forward file uploaded.</span>
+        </div>
+        <!-- Reverse upload -->
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.4px">🔄 Reverse File</span>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+            <input type="file" id="tgtRevFile" accept=".xlsx,.xls" style="display:none">
+            <button class="btn bp" onclick="document.getElementById('tgtRevFile').click()">📂 Upload Reverse File</button>
+            <button class="btn br" id="tgtRevRemoveBtn" onclick="removeTargetUpload('reverse')" style="display:none">↩ Remove Upload</button>
+          </div>
+          <span id="tgtRevStatus" style="font-size:11px;color:var(--tx3)">No reverse file uploaded.</span>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <button class="btn bg" onclick="downloadTargetReportImage()" style="font-size:10px;padding:4px 10px;color:var(--gold);border-color:rgba(233,223,67,.4)">🖼 Export PNG</button>
+          <span id="tgtHistStatus" style="font-size:10px;color:var(--tx3);font-style:italic">Historical data: loading…</span>
+        </div>
+      </div>
+      <div id="tgtProg" style="display:none;padding:0 16px 10px">
+        <div class="ptxt" id="tgtPtxt">Processing…</div>
+        <div class="ptrk"><div class="pbar" id="tgtPbar" style="width:0"></div></div>
+      </div>
+    </div>
+
+    <!-- Three side-by-side reports -->
+    <div id="tgtReports" style="display:grid;grid-template-columns:repeat(3,minmax(320px,1fr));gap:14px;align-items:start">
+      <div class="tgt-report-col">
+        <div class="tgt-report-title" style="background:#fff200">D6 FWD R@DC TARGET COMPLETION</div>
+        <div id="tgtReport_fwd6"></div>
+      </div>
+      <div class="tgt-report-col">
+        <div class="tgt-report-title" style="background:#fff200">D6 RVP R@DC TARGET COMPLETION</div>
+        <div id="tgtReport_rev6"></div>
+      </div>
+      <div class="tgt-report-col">
+        <div class="tgt-report-title" style="background:#fff200">D10 RVP R@DC TARGET COMPLETION</div>
+        <div id="tgtReport_rev10"></div>
+      </div>
+    </div>
+
   </div>
 </div>
+
 
 <!-- ═══ CLOSURE REPORT — Independent Page ═══ -->
 <div id="closureSection" class="page-section">
@@ -5051,6 +5115,578 @@ function toggleHovChartType(){
 }
 
 /* ── Main HOV render ── */
+/* ════════════════════════════════════════════════════════════════════════
+   TARGET ACHIEVED % REPORT MODULE
+   ─────────────────────────────────────────────────────────────────────────
+   Independent module. Reuses the dashboard's file-identification, Excel
+   readers, and Google Apps Script backend. Produces three reports:
+     • D6 FWD  R@DC   (Forward, Pivot=RECEIVED_AT_DC, Ageing_from_Bag_Rec = 6)
+     • D6 REV  R@DC   (Reverse, Reason ∈ {RECEIVED_AT_DC, MISROUTED}, Ageing = 6)
+     • D10 REV R@DC   (Reverse, Reason ∈ {RECEIVED_AT_DC, MISROUTED}, Ageing = 10)
+
+   Backend storage (one sheet per report) — Rows: Current Location,
+   Columns: File Date, Values: AWB count — via the existing
+   'daily_age_pivot' Apps Script handler, pointed at the Target sheet.
+   The rolling "Last 10 Days Average" is computed from the most recent 10
+   date columns (historical + current upload).
+═══════════════════════════════════════════════════════════════════════ */
+
+/* Dedicated backend spreadsheet for this module (provided separately). */
+const TGT_SHEET_ID='1K0yBdj6Hc8H5NTtKnY5voONxSFojnOqe56D5BOZo5No';
+const TGT_GVIZ_BASE=`https://docs.google.com/spreadsheets/d/${TGT_SHEET_ID}/gviz/tq`;
+
+/* The three reports. sheet = backend tab name (also the historical source). */
+const TGT_REPORTS=[
+  {key:'fwd6',  sheet:'D6 FWD R@DC',  src:'forward', age:6,  elId:'tgtReport_fwd6'},
+  {key:'rev6',  sheet:'D6 REV R@DC',  src:'reverse', age:6,  elId:'tgtReport_rev6'},
+  {key:'rev10', sheet:'D10 REV R@DC', src:'reverse', age:10, elId:'tgtReport_rev10'}
+];
+
+/* Site-wise targets per report (seeded from the reference image).
+   Keys are canonical location names (upper-cased, trimmed). Update freely —
+   any site not listed defaults to target 0.                                */
+const TGT_TARGETS={
+  fwd6:{
+    'ONENCR DC':54,'AHMEDABAD DC':24,'BANGALORE DC':17,'MUMBAI DC':10,'SURAT DC':19,
+    'JAIPUR DC':12,'NCR BILASPUR DC':10,'NCR BAMNOLI DC':3,'NAGPUR DC':5,'KOLKATA DC':4,
+    'LUCKNOW DC':6,'PATNA DC':2,'BHOPAL DC':0,'CHENNAI DC':0,'RAIPUR DC':2,'KOLKATA 2 DC':1,
+    'PUNE DC':2,'HYDERABAD DC':9,'HUBLI DC':1,'MADURAI DC':0,'INDORE DC':1,'KOCHI DC':1,
+    'VISAKHAPATNAM DC':1,'CCU_LARGE DC':0,'NCR TAURU DC':0,'BHUBNESHWAR DC':0,'VARANASI DC':0,
+    'GUWAHATI DC':1,'KANPUR DC':0,'SILIGURI DC':0,'COIMBATORE DC':0,'TRICHY DC':0,'RANCHI DC':0,
+    'UDAIPUR DC':1,'PURNIA DC':0,'BANGALORE XD DC':0,'SRINAGAR DC':14,'MYSORE DC':0,'SAGAR DC':0,
+    'KOZHIKODE DC':0,'NCR_BAMNOLI_LARGE DC':0,'LUDHIANA DC':0,'BLR_LARGE DC':0,'BOM_LARGE DC':0,
+    'DIBRUGARH DC':0,'JAMMU DC':0,'AURANGABAD DC':0
+  },
+  rev6:{
+    'ONENCR DC':70,'BANGALORE DC':68,'MUMBAI DC':26,'AHMEDABAD DC':50,'JAIPUR DC':26,
+    'SURAT DC':24,'HYDERABAD DC':27,'NCR TAURU DC':23,'NAGPUR DC':12,'CHENNAI DC':2,
+    'LUCKNOW DC':15,'KOLKATA 2 DC':11,'PATNA DC':10,'NCR BAMNOLI DC':4,'KOLKATA DC':3,
+    'NCR BILASPUR DC':4,'VIJAYAWADA DC':1,'BHOPAL DC':1,'INDORE DC':5,'RAIPUR DC':1,
+    'KOCHI DC':6,'COIMBATORE DC':5,'PUNE DC':1,'MADURAI DC':1,'LUDHIANA DC':1,
+    'VISAKHAPATNAM DC':0,'BHUBNESHWAR DC':0,'GUWAHATI DC':1,'CCU_LARGE DC':1,'HUBLI DC':1,
+    'NCR_TAURU_LARGE DC':0,'KOZHIKODE DC':0,'TRICHY DC':0,'VARANASI DC':0,'NCR_BAMNOLI_LARGE DC':0,
+    'UDAIPUR DC':0,'CHANDIGARH DC':0,'KANPUR DC':0,'SILIGURI DC':1,'GORAKHPUR DC':0,
+    'SAGAR DC':0,'RANCHI DC':0
+  },
+  rev10:{
+    'ONENCR DC':59,'BANGALORE DC':46,'AHMEDABAD DC':36,'MUMBAI DC':18,'JAIPUR DC':23,
+    'NCR TAURU DC':22,'NAGPUR DC':9,'SURAT DC':21,'LUCKNOW DC':11,'HYDERABAD DC':15,
+    'KOLKATA 2 DC':7,'CHENNAI DC':1,'PATNA DC':7,'KOLKATA DC':3,'NCR BAMNOLI DC':2,
+    'NCR BILASPUR DC':3,'BHOPAL DC':0,'INDORE DC':2,'VIJAYAWADA DC':0,'COIMBATORE DC':3,
+    'MADURAI DC':0,'LUDHIANA DC':0,'RAIPUR DC':1,'KOCHI DC':4,'BHUBNESHWAR DC':0,
+    'GUWAHATI DC':0,'VISAKHAPATNAM DC':1,'CCU_LARGE DC':2,'PUNE DC':0,'HUBLI DC':0,
+    'SILIGURI DC':1,'KOZHIKODE DC':0,'NCR_TAURU_LARGE DC':0,'KANPUR DC':0,'VARANASI DC':0,
+    'SAGAR DC':0,'RANCHI DC':0,'PURNIA DC':0,'BANGALORE XD DC':0,'BOM_LARGE DC':0,
+    'NCR_BAMNOLI_LARGE DC':0,'BLR_LARGE DC':0,'UDAIPUR DC':0,'BANGALORE REV DC':0,
+    'JAMMU DC':0,'AURANGABAD DC':0
+  }
+};
+
+/* Module state:
+   _tgtHist[key] = { location: { date: count } }  — historical + committed
+   _tgtPending[key] = { date, counts:{location:count} } — the current, not-yet
+       -removable upload (used for Undo).                                    */
+const _tgtHist={fwd6:{},rev6:{},rev10:{}};
+const _tgtPending={forward:null,reverse:null};
+let _tgtHistLoaded=false;
+let _tgtInit=false;
+
+/* Display-name registry: canonicalKey → original-cased name (e.g. "OneNCR DC").
+   Seeded so report rows show names exactly as in the source, not title-cased. */
+const _tgtDisplayNames={};
+function _tgtRegisterName(name){
+  const k=tgtLocKey(name);
+  if(k&&!_tgtDisplayNames[k])_tgtDisplayNames[k]=String(name).trim();
+  return k;
+}
+// Seed from the target list (correct canonical spellings from the reference).
+Object.values(TGT_TARGETS).forEach(m=>Object.keys(m).forEach(n=>_tgtRegisterName(n)));
+
+function _tgtProg(show,txt){
+  const p=document.getElementById('tgtProg');if(p)p.style.display=show?'block':'none';
+  if(show&&txt){const t=document.getElementById('tgtPtxt');if(t)t.textContent=txt;
+    const b=document.getElementById('tgtPbar');if(b)b.style.width='60%';}
+}
+
+/* Canonical location key. */
+function tgtLocKey(s){return String(s||'').toUpperCase().replace(/\s+/g,' ').trim();}
+
+/* ── Entry point (called when the Target page opens) ── */
+async function initTargetReport(){
+  if(!_tgtInit){
+    _tgtInit=true;
+    // wire the two file inputs
+    const fwd=document.getElementById('tgtFwdFile');
+    if(fwd)fwd.addEventListener('change',e=>_onTargetFile('forward',e));
+    const rev=document.getElementById('tgtRevFile');
+    if(rev)rev.addEventListener('change',e=>_onTargetFile('reverse',e));
+  }
+  applyRoleUI();
+  if(!_tgtHistLoaded){
+    await loadTargetHistory();
+  }
+  renderAllTargetReports();
+}
+
+/* ── Load historical data from the dedicated Google Sheet (public gviz read) ──
+   Each report tab is a location × date pivot. First column = Current Location,
+   remaining columns = dates. Populates _tgtHist[key][loc][date] = count.      */
+async function loadTargetHistory(){
+  const st=document.getElementById('tgtHistStatus');
+  if(st)st.textContent='Historical data: loading…';
+  let anyLoaded=false;
+  for(const rep of TGT_REPORTS){
+    try{
+      const rows=await _tgtGvizCSV(rep.sheet);
+      if(rows&&rows.length>1){
+        _tgtHist[rep.key]=_tgtParsePivot(rows);
+        anyLoaded=true;
+      }else{
+        _tgtHist[rep.key]=_tgtHist[rep.key]||{};
+      }
+    }catch(e){
+      console.warn('[target] history load failed for',rep.sheet,e.message);
+      _tgtHist[rep.key]=_tgtHist[rep.key]||{};
+    }
+  }
+  _tgtHistLoaded=true;
+  if(st)st.textContent=anyLoaded?'Historical data: loaded ✓':'Historical data: none found (starting fresh)';
+}
+
+/* Parse a location × date pivot CSV into {location:{date:count}}. */
+function _tgtParsePivot(rows){
+  const out={};
+  const header=rows[0].map(h=>String(h||'').trim());
+  // date columns = every column after the first whose header is non-empty
+  const dateCols=[];
+  for(let c=1;c<header.length;c++){
+    const h=header[c];
+    if(h&&!/grand\s*total|average|target/i.test(h))dateCols.push({c,date:_tgtNormDate(h)});
+  }
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r];
+    const rawName=String(row[0]||'').trim();
+    const loc=tgtLocKey(rawName);
+    if(!loc||/grand\s*total/i.test(loc))continue;
+    _tgtRegisterName(rawName);
+    if(!out[loc])out[loc]={};
+    dateCols.forEach(({c,date})=>{
+      if(!date)return;
+      const v=parseInt(String(row[c]||'').replace(/[^0-9\-]/g,''),10);
+      if(!isNaN(v))out[loc][date]=v;
+    });
+  }
+  return out;
+}
+
+/* Normalise a date-ish header to YYYY-MM-DD (best-effort; accepts 01-Jul etc). */
+function _tgtNormDate(s){
+  const t=String(s||'').trim();
+  let m=t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=t.match(/(\d{1,2})[-\/\s]([A-Za-z]{3,})[-\/\s]?(\d{2,4})?/);
+  if(m){
+    const months={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    const mo=months[m[2].slice(0,3).toLowerCase()];
+    if(mo){
+      let yr=m[3]||String(new Date().getFullYear());
+      if(yr.length===2)yr='20'+yr;
+      return`${yr}-${mo}-${m[1].padStart(2,'0')}`;
+    }
+  }
+  m=t.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+  if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  // Already a plausible label — keep as-is (used as a column key)
+  return t;
+}
+
+/* gviz CSV reader for the dedicated Target sheet. */
+async function _tgtGvizCSV(sheetName){
+  const encoded=encodeURIComponent(sheetName);
+  const tries=[
+    `${TGT_GVIZ_BASE}?tqx=out:csv&sheet=${encoded}`,
+    `https://docs.google.com/spreadsheets/d/${TGT_SHEET_ID}/export?format=csv&sheet=${encoded}`
+  ];
+  for(const url of tries){
+    try{
+      const r=await fetch(url,{cache:'no-cache'});
+      if(r.ok){
+        const text=await r.text();
+        if(text&&text.length>5&&!text.includes('<!DOCTYPE')&&!text.includes('<html')){
+          const rows=_parseCSVText(text);
+          if(rows&&rows.length>1)return rows;
+        }
+      }
+    }catch(e){/* try next */}
+  }
+  return null;
+}
+
+/* ════════════════════════════════════════════════════════
+   FILE PROCESSING
+   Forward → Pivot=RECEIVED_AT_DC, Ageing_from_Bag_Rec ONLY
+   Reverse → Reason∈{RECEIVED_AT_DC,MISROUTED}, Ageing ONLY
+════════════════════════════════════════════════════════ */
+
+async function _onTargetFile(src,ev){
+  if(!requireAdmin(`Upload ${src} file`)){ev.target.value='';return;}
+  const file=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  await processTargetFile(src,file);
+}
+
+/* Read a Forward/Reverse Excel file, verify its type via existing logic,
+   extract site-wise counts for the relevant report(s), stage as pending,
+   push to backend, and refresh. */
+async function processTargetFile(src,file){
+  const statusEl=document.getElementById(src==='forward'?'tgtFwdStatus':'tgtRevStatus');
+  _tgtProg(true,`Reading ${file.name}…`);
+  try{
+    const ext=(file.name.split('.').pop()||'').toLowerCase();
+    if(ext!=='xlsx'&&ext!=='xls'){
+      if(statusEl)statusEl.textContent='❌ Please upload an Excel (.xlsx) file.';
+      _tgtProg(false);return;
+    }
+    const buf=await file.arrayBuffer();
+    let result=null;
+    if(typeof readExcelNative==='function'&&typeof pako!=='undefined'){
+      try{result=await readExcelNative(buf,file.name);}catch(_){}
+    }
+    if(!result||!result.rows||result.rows.length<2)result=readExcel(buf,null);
+    if(!result||!result.rows||result.rows.length<2){
+      if(statusEl)statusEl.textContent='❌ Could not read any data rows from the file.';
+      _tgtProg(false);return;
+    }
+    const hi=result.headerRow!==undefined?result.headerRow:findHdrRow(result.rows);
+    const hdrs=cleanH((result.rows[hi]||[]).map(h=>String(h==null?'':h)));
+
+    // Reuse existing identification; require the correct type for this button.
+    const ident=identify(hdrs,file.name);
+    const detected=ident.type;
+    const wantForward=(src==='forward');
+    const okType=wantForward?(detected==='forward'||detected==='forwardShort'):(detected==='reverse');
+    if(!okType){
+      if(statusEl)statusEl.textContent=`❌ This looks like a ${detected||'unknown'} file. Please upload a ${wantForward?'Forward':'Reverse'} file.`;
+      _tgtProg(false);return;
+    }
+
+    const date=xDate(file.name);
+    const rows=buildRows(result.rows,hi,hdrs);
+
+    if(wantForward){
+      const counts=_extractForwardCounts(rows);
+      _tgtPending.forward={date,file:file.name,reports:{fwd6:counts}};
+      _tgtCommitPending('forward');
+      if(statusEl)statusEl.textContent=`✅ ${file.name} — ${date} · ${_sumCounts(counts)} AWBs (D6 FWD R@DC)`;
+    }else{
+      const c6=_extractReverseCounts(rows,6);
+      const c10=_extractReverseCounts(rows,10);
+      _tgtPending.reverse={date,file:file.name,reports:{rev6:c6,rev10:c10}};
+      _tgtCommitPending('reverse');
+      if(statusEl)statusEl.textContent=`✅ ${file.name} — ${date} · D6:${_sumCounts(c6)} · D10:${_sumCounts(c10)} AWBs`;
+    }
+
+    // Show the Remove button for this src
+    const rmBtn=document.getElementById(src==='forward'?'tgtFwdRemoveBtn':'tgtRevRemoveBtn');
+    if(rmBtn)rmBtn.style.display='inline-flex';
+
+    renderAllTargetReports();
+    _tgtProg(false);
+
+    // Push to backend (append-only pivot). Non-blocking on failure.
+    pushTargetToBackend(src).catch(e=>console.warn('[target] backend push failed:',e.message));
+
+    toast(`🎯 ${wantForward?'Forward':'Reverse'} file processed for ${date}`,'tok');
+  }catch(e){
+    console.error('[target] processTargetFile:',e);
+    if(statusEl)statusEl.textContent='❌ Error: '+e.message;
+    _tgtProg(false);
+  }
+}
+
+function _sumCounts(c){return Object.values(c).reduce((s,v)=>s+v,0);}
+
+/* Merge a pending upload's counts into _tgtHist (the live dataset). */
+function _tgtCommitPending(src){
+  const pend=_tgtPending[src];
+  if(!pend)return;
+  Object.entries(pend.reports).forEach(([repKey,counts])=>{
+    const store=_tgtHist[repKey]||(_tgtHist[repKey]={});
+    Object.entries(counts).forEach(([loc,cnt])=>{
+      const k=tgtLocKey(loc);
+      if(!store[k])store[k]={};
+      store[k][pend.date]=cnt; // overwrite same-date cell for this location
+    });
+    // Ensure sites present in target list but absent in file appear with 0
+    Object.keys(TGT_TARGETS[repKey]||{}).forEach(loc=>{
+      const k=tgtLocKey(loc);
+      if(!store[k])store[k]={};
+      if(store[k][pend.date]===undefined)store[k][pend.date]=0;
+    });
+  });
+}
+
+/* FORWARD: Pivot = RECEIVED_AT_DC; age from Ageing_from_Bag_Rec ONLY; age===6. */
+function _extractForwardCounts(rows){
+  const counts={};
+  for(const row of rows){
+    if(!row||!Object.values(row).some(v=>String(v).trim()))continue;
+    const pivot=nv(gv(row,'pivot','Pivot','PIVOT'));
+    if(pivot!=='RECEIVED_AT_DC')continue;
+    // AGE — ONLY Ageing_from_Bag_Rec (no fallback, no derived age)
+    const ageStr=gv(row,'Ageing_from_Bag_Rec','ageing_from_bag_rec','Ageing_From_Bag_Rec','ageing from bag rec');
+    if(ageStr==='')continue;
+    const age=Math.round(parseFloat(ageStr));
+    if(age!==6)continue;
+    const locRaw=gv(row,'current_location','Current_location','Current_Location','currentlocation','current location','location','Location')||'UNKNOWN';
+    const loc=_tgtRegisterName(locRaw);
+    counts[loc]=(counts[loc]||0)+1;
+  }
+  return counts;
+}
+
+/* REVERSE: Reason ∈ {RECEIVED_AT_DC, MISROUTED}; age from Ageing ONLY; age===target. */
+function _extractReverseCounts(rows,targetAge){
+  const counts={};
+  for(const row of rows){
+    if(!row||!Object.values(row).some(v=>String(v).trim()))continue;
+    const reason=nv(gv(row,'reason of loss','Reason of Loss','reason_of_loss','Reason_of_Loss','Reason Of Loss','reasonofloss','REASON OF LOSS'));
+    if(reason!=='RECEIVED_AT_DC'&&reason!=='MISROUTED')continue;
+    // AGE — ONLY the Ageing column (no alternate, no derived)
+    const ageStr=gv(row,'Ageing','ageing');
+    if(ageStr==='')continue;
+    const age=Math.round(parseFloat(ageStr));
+    if(age!==targetAge)continue;
+    const locRaw=gv(row,'current_location','Current_location','Current_Location','currentlocation','current location','location','Location')||'UNKNOWN';
+    const loc=_tgtRegisterName(locRaw);
+    counts[loc]=(counts[loc]||0)+1;
+  }
+  return counts;
+}
+
+/* ════════════════════════════════════════════════════════
+   BACKEND PUSH — append the current date's counts to the
+   dedicated Target sheet (location × date pivot, never
+   overwriting historical columns).
+════════════════════════════════════════════════════════ */
+async function pushTargetToBackend(src){
+  const url=getGsUrl();
+  if(!url)return;
+  const pend=_tgtPending[src];
+  if(!pend)return;
+  for(const [repKey,counts] of Object.entries(pend.reports)){
+    const rep=TGT_REPORTS.find(r=>r.key===repKey);
+    if(!rep)continue;
+    const store=_tgtHist[repKey]||{};
+    // Build rows for EVERY known location (union of target list + store + file)
+    const locs=new Set([...Object.keys(store),...Object.keys(TGT_TARGETS[repKey]||{}).map(tgtLocKey),...Object.keys(counts).map(tgtLocKey)]);
+    const rowsPayload=[...locs].map(loc=>({location:loc,dateCounts:{[pend.date]:(store[loc]&&store[loc][pend.date])||0}}));
+    const payload={
+      type:'target_pivot',        // handled by new GAS branch (falls back to daily_age_pivot behaviour)
+      targetSheetId:TGT_SHEET_ID, // tells GAS to open the dedicated spreadsheet
+      sheetName:rep.sheet,
+      dates:[pend.date],
+      rows:rowsPayload
+    };
+    try{await _sheetsFetch(url,payload);}
+    catch(e){console.warn('[target] push',rep.sheet,e.message);}
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   UNDO / REMOVE LAST UPLOAD
+   Rolls back only the pending upload's contribution; historical
+   data (previous date columns) is untouched.
+════════════════════════════════════════════════════════ */
+async function removeTargetUpload(src){
+  const pend=_tgtPending[src];
+  if(!pend){
+    toast('Nothing to remove — no recent upload.','tw');return;
+  }
+  if(!requireAdmin('Remove uploaded file'))return;
+  if(!confirm(`Remove the ${src} upload for ${pend.date}?\n\nThis rolls back only this file's counts. Historical data stays intact.`))return;
+
+  // Roll back the pending date's cells for each affected report.
+  Object.keys(pend.reports).forEach(repKey=>{
+    const store=_tgtHist[repKey];
+    if(!store)return;
+    Object.keys(store).forEach(loc=>{
+      if(store[loc]&&store[loc][pend.date]!==undefined)delete store[loc][pend.date];
+    });
+  });
+
+  // Remove the date column from the backend sheet(s).
+  const url=getGsUrl();
+  if(url){
+    for(const repKey of Object.keys(pend.reports)){
+      const rep=TGT_REPORTS.find(r=>r.key===repKey);
+      if(!rep)continue;
+      try{await _sheetsFetch(url,{type:'target_delete_date',targetSheetId:TGT_SHEET_ID,sheetName:rep.sheet,date:pend.date});}
+      catch(e){console.warn('[target] delete date failed',rep.sheet,e.message);}
+    }
+  }
+
+  _tgtPending[src]=null;
+  const rmBtn=document.getElementById(src==='forward'?'tgtFwdRemoveBtn':'tgtRevRemoveBtn');
+  if(rmBtn)rmBtn.style.display='none';
+  const statusEl=document.getElementById(src==='forward'?'tgtFwdStatus':'tgtRevStatus');
+  if(statusEl)statusEl.textContent=`Upload removed. You can upload the correct ${src} file now.`;
+
+  renderAllTargetReports();
+  toast(`↩ ${src} upload removed`,'tok');
+}
+
+/* ════════════════════════════════════════════════════════
+   REPORT RENDERING
+════════════════════════════════════════════════════════ */
+function renderAllTargetReports(){
+  TGT_REPORTS.forEach(rep=>renderTargetReport(rep));
+}
+
+/* Compute rolling last-10-days average from a location's date→count map. */
+function _tgtRollingAvg(dateCountMap,recentDates){
+  let sum=0,n=0;
+  recentDates.forEach(d=>{
+    const v=dateCountMap[d];
+    if(v!==undefined){sum+=v;n++;}
+    else{n++;} // date exists in dataset but this loc had none → counts as 0
+  });
+  return n?sum/n:0;
+}
+
+function renderTargetReport(rep){
+  const el=document.getElementById(rep.elId);
+  if(!el)return;
+  const store=_tgtHist[rep.key]||{};
+  const targets=TGT_TARGETS[rep.key]||{};
+
+  // All dates present across the dataset (sorted ascending), then last 10.
+  const allDates=new Set();
+  Object.values(store).forEach(m=>Object.keys(m).forEach(d=>allDates.add(d)));
+  const sortedDates=[...allDates].sort();
+  const recentDates=sortedDates.slice(-10);
+  const currentDate=sortedDates.length?sortedDates[sortedDates.length-1]:'';
+
+  // Union of locations: dataset + target list.
+  const locSet=new Set([...Object.keys(store),...Object.keys(targets).map(tgtLocKey)]);
+  if(!locSet.size){
+    el.innerHTML=`<div class="empty" style="padding:20px"><div class="et">No data yet</div>
+      <div class="em">Upload a file or connect the historical sheet to populate this report.</div></div>`;
+    return;
+  }
+
+  // Build rows.
+  const rows=[...locSet].map(loc=>{
+    const m=store[loc]||{};
+    const today=currentDate?(m[currentDate]||0):0;
+    const avg=_tgtRollingAvg(m,recentDates);
+    const target=targets[loc]!==undefined?targets[loc]:0;
+    return{loc,today,avg,target};
+  });
+  // Sort by rolling average descending (spec §8).
+  rows.sort((a,b)=>b.avg-a.avg||b.today-a.today);
+
+  // Grand totals.
+  const gToday=rows.reduce((s,r)=>s+r.today,0);
+  const gAvg=rows.reduce((s,r)=>s+r.avg,0);
+  const gTarget=rows.reduce((s,r)=>s+r.target,0);
+
+  // AVERAGE heat scale (red gradient — highest avg = strongest red).
+  const maxAvg=Math.max(1,...rows.map(r=>r.avg));
+
+  const dateLabel=currentDate?_tgtFmtDateLabel(currentDate):'Count';
+  let html=`<div style="max-height:640px;overflow:auto"><table class="tgt-table">
+    <thead><tr>
+      <th class="tgt-rowlabel">${xe(rep.src==='reverse'&&rep.key==='rev10'?'DC':'Row Labels')}</th>
+      <th>${xe(dateLabel)}</th><th>AVERAGE</th><th>TARGETS</th><th>TARGET COMPLETION %</th>
+    </tr></thead><tbody>`;
+  // Grand Total row (styled yellow like reference).
+  html+=`<tr class="tgt-grand"><td class="tgt-loc">Grand Total</td>
+    <td>${fn(gToday)}</td><td>${fn(Math.round(gAvg))}</td><td>${fn(gTarget)}</td><td></td></tr>`;
+  rows.forEach(r=>{
+    const avgBg=_tgtAvgColor(r.avg,maxAvg);
+    let compCell;
+    if(r.today===0){
+      compCell=`<td style="background:#63be7b"><span class="tgt-zero">Zero Pendency Achieved</span></td>`;
+    }else{
+      const pct=Math.round((r.target/r.today)*100);
+      const bg=_tgtCompletionColor(pct);
+      compCell=`<td style="background:${bg};font-weight:700">${pct}%</td>`;
+    }
+    html+=`<tr>
+      <td class="tgt-loc">${xe(_tgtDisplayLoc(r.loc))}</td>
+      <td>${fn(r.today)}</td>
+      <td style="background:${avgBg}">${fn(Math.round(r.avg))}</td>
+      <td>${fn(r.target)}</td>
+      ${compCell}
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  el.innerHTML=html;
+}
+
+/* Title-case a canonical location for display (keeps _LARGE etc). */
+/* Display name for a canonical location key: prefer the registered original
+   casing (from file/history); else a safe title-case that preserves acronym
+   tokens (NCR, DC, XD, CCU, BLR, BOM) and _LARGE-style suffixes. */
+function _tgtDisplayLoc(loc){
+  const k=tgtLocKey(loc);
+  if(_tgtDisplayNames[k])return _tgtDisplayNames[k];
+  const KEEP=new Set(['NCR','DC','XD','CCU','BLR','BOM','RVP','FWD']);
+  return String(loc||'').split(' ').map(tok=>{
+    if(tok.includes('_'))return tok;            // CCU_LARGE, NCR_TAURU_LARGE
+    if(KEEP.has(tok))return tok;                // keep acronyms
+    if(/^\d+$/.test(tok))return tok;            // "2"
+    return tok.charAt(0)+tok.slice(1).toLowerCase();
+  }).join(' ');
+}
+
+function _tgtFmtDateLabel(d){
+  const m=String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(!m)return d;
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${parseInt(m[3])}-${months[parseInt(m[2])-1]}`;
+}
+
+/* AVERAGE column red heat: white → red as value → max. */
+function _tgtAvgColor(v,max){
+  if(v<=0)return '#ffffff';
+  const t=Math.min(1,v/max);
+  // interpolate white(255,255,255) → red(237,110,110)
+  const r=Math.round(255+(237-255)*t);
+  const g=Math.round(255+(110-255)*t);
+  const b=Math.round(255+(110-255)*t);
+  return`rgb(${r},${g},${b})`;
+}
+
+/* TARGET COMPLETION % green→yellow: higher % greener, lower % yellower. */
+function _tgtCompletionColor(pct){
+  // Clamp to 0..200 for the gradient; ≥100 = green, ~0 = yellow.
+  const t=Math.max(0,Math.min(1,pct/150));
+  // yellow(255,235,130) → green(99,190,123)
+  const r=Math.round(255+(99-255)*t);
+  const g=Math.round(235+(190-235)*t);
+  const b=Math.round(130+(123-130)*t);
+  return`rgb(${r},${g},${b})`;
+}
+
+/* Export the three reports as a PNG (reuses html2canvas if present). */
+async function downloadTargetReportImage(){
+  const node=document.getElementById('tgtReports');
+  if(!node)return;
+  if(typeof html2canvas==='undefined'){
+    toast('PNG export unavailable (html2canvas not loaded).','tw');return;
+  }
+  try{
+    const canvas=await html2canvas(node,{scale:2,backgroundColor:'#ffffff'});
+    const a=document.createElement('a');
+    a.href=canvas.toDataURL('image/png');
+    a.download='Target_Achieved_Report.png';
+    a.click();
+  }catch(e){toast('PNG export failed: '+e.message,'te');}
+}
+
 /* renderHovTab — entry point for the redesigned 4-tab HOV Tracker.
    Builds the type panels once, then renders the active file-type tab. */
 function renderHovTab(){
@@ -7572,6 +8208,7 @@ function showDashboardPage(page){
   if(ht)ht.textContent=cfg.title;
   // Render HOV when opened (preserves existing behaviour)
   if(page==='hov')renderHovTab();
+  if(page==='target')initTargetReport();
   window.scrollTo(0,0);
 }
 
@@ -8300,7 +8937,7 @@ const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rYQ';
    The dashboard auto-discovers this from the spreadsheet's __url__ sentinel row.
    You can also paste it here permanently after deploying a new version.
    Current deployment URL (update this when you redeploy):                    */
-const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbxXrpcfqZJqnKP55cVmGH6uaakUNAGPDYxDCmyFi3k44FqzkJ2ZFwC6_wZVNsokTtg8/exec';
+const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbzGYRPdy8JAkGWmLRtjBFF8Q5aLBFZMvlkLNMh7GbJY93fvMACLf0vhiIqeRGDmJI5J/exec';
 
 const GS_BOOTSTRAP_URLS=[
   `https://docs.google.com/spreadsheets/d/${GS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=MASTER+SNAPSHOT_1`,
@@ -10449,6 +11086,8 @@ const ADMIN_BTN_SELECTORS=[
   '#hovSection .hov-type-panel .btn.bp', // per-tab Upload File
   '#hovSection .hov-type-panel .btn.bk', // per-tab Save HOV Data
   '#hovSection .hov-type-panel .btn.br', // per-tab Clear
+  '#targetSection .btn.bp',   // Target: Upload Forward/Reverse
+  '#targetSection .btn.br',   // Target: Remove Upload
 ];
 
 /* ── Enter VIEW MODE — no login required ── */
