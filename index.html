@@ -1273,10 +1273,18 @@ function persistM(){
    NORMALISATION HELPERS
 ═══════════════════════════════════════════════ */
 // Normalise a column/header name
+/* PERF: ns() is called millions of times when parsing wide files (180+ cols).
+   Memoise it — the normalisation result for a given string never changes. */
+const _nsCache=new Map();
 function ns(s){
-  return String(s==null?'':s)
+  const raw=String(s==null?'':s);
+  const hit=_nsCache.get(raw);
+  if(hit!==undefined)return hit;
+  const out=raw
     .replace(/^\uFEFF/,'').replace(/[\u00A0\u202F\u2009\u200B-\u200D]/g,' ')
     .trim().toLowerCase().replace(/[\s_\-\.\/\\]+/g,' ').trim();
+  if(_nsCache.size<20000)_nsCache.set(raw,out);
+  return out;
 }
 // Normalise a DATA VALUE (for filter comparisons)
 function nv(s){
@@ -1289,10 +1297,27 @@ function hasE(hdrs,...tgts){return tgts.some(t=>hdrs.some(h=>meq(h,t)))}
 function hasF(hdrs,...kw){return hdrs.some(h=>mall(h,...kw))}
 
 /* Get cell value from row — BOM-safe */
-function gv(row,...names){
+/* PERF: build a normalised-key → original-key map once per row shape.
+   Rows from one file all share the same key set, so the map is reused
+   across every row instead of re-scanning 180+ keys for each lookup.
+   Matching semantics are identical to the previous meq()-based scan. */
+const _gvMapCache=new Map();
+function _gvKeyMap(row){
   const keys=Object.keys(row);
+  const sig=keys.length+'|'+keys[0]+'|'+keys[keys.length-1];
+  let m=_gvMapCache.get(sig);
+  if(m&&m.__n===keys.length)return m;
+  m=Object.create(null);m.__n=keys.length;
+  // First occurrence wins, matching Array.find() behaviour.
+  for(const k of keys){const n=ns(k);if(m[n]===undefined)m[n]=k;}
+  if(_gvMapCache.size>50)_gvMapCache.clear();
+  _gvMapCache.set(sig,m);
+  return m;
+}
+function gv(row,...names){
+  const map=_gvKeyMap(row);
   for(const name of names){
-    const k=keys.find(k=>meq(k,name));
+    const k=map[ns(name)];
     if(k!==undefined){const v=String(row[k]??'').trim();if(v)return v;}
   }
   return '';
@@ -3927,7 +3952,15 @@ function showP(v){q('#prog').style.display=v?'block':'none';}
 function setP(pct,lbl){q('#ptxt').textContent=lbl;q('#pbar').style.width=(pct<0?55:pct)+'%';}
 let _tt;
 function toast(msg,cls='ti'){
-  const el=q('#toast');el.innerHTML=msg;el.className=`toast ${cls} show`;
+  let el=q('#toast');
+  if(!el){
+    // #toast element may not exist in the DOM — create it once so toast()
+    // never throws "Cannot set properties of null (setting 'innerHTML')".
+    el=document.createElement('div');
+    el.id='toast';
+    (document.body||document.documentElement).appendChild(el);
+  }
+  el.innerHTML=msg;el.className=`toast ${cls} show`;
   clearTimeout(_tt);_tt=setTimeout(()=>el.className='toast',5000);
 }
 function q(s){return document.querySelector(s);}
@@ -4002,6 +4035,43 @@ function readNamedSheet(buf,targetName){
     }catch(_){}
   }
   return null;
+}
+
+/* ── HOV workbook reader — parses the workbook ONCE and picks the sheet that
+   actually holds the HOV data. Real base files often contain a small summary
+   tab first (e.g. "Sheet1"/"Sheet2") followed by the wide data sheet, so the
+   sheet is chosen by scoring HOV header presence, then by data-row count —
+   not by guessing sheet names. Returns {rows,sheetName,headerRow,hdrs}. */
+function readHovWorkbookOnce(buf){
+  let wb=null;
+  for(const opts of [{cellFormula:false,cellText:false,cellHTML:false},{raw:true},{}]){
+    try{wb=XLSX.read(buf,Object.assign({type:'array',WTF:false},opts));}catch(e){wb=null;}
+    if(wb&&wb.SheetNames&&wb.SheetNames.length)break;
+  }
+  if(!wb||!wb.SheetNames||!wb.SheetNames.length)return null;
+
+  // Header keywords that indicate a genuine HOV data sheet.
+  const KEYS=['awb','ageing','age','pivot','reason of loss','current_location',
+              'current location','product value','product category','hov',
+              'bin_level','message','action_user','destination'];
+  let best=null;
+  for(const sname of wb.SheetNames){
+    const ws=wb.Sheets[sname];if(!ws)continue;
+    if(!ws['!ref']&&ws['!dim'])try{ws['!ref']=ws['!dim'];}catch(_){}
+    let rows;
+    try{rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});}catch(_){continue;}
+    if(!rows||rows.length<2)continue;
+    const hi=findHdrRow(rows);
+    const hdrs=cleanH((rows[hi]||[]).map(h=>String(h==null?'':h)));
+    const low=hdrs.map(h=>String(h).toLowerCase());
+    let score=0;
+    KEYS.forEach(k=>{if(low.some(h=>h.includes(k)))score++;});
+    const dataRows=rows.length-hi-1;
+    const cand={rows,sheetName:sname,headerRow:hi,hdrs,score,dataRows};
+    // Prefer a higher HOV-header score; break ties by data-row count.
+    if(!best||cand.score>best.score||(cand.score===best.score&&cand.dataRows>best.dataRows))best=cand;
+  }
+  return best;
 }
 
 /* HOV row processors */
@@ -4198,32 +4268,11 @@ async function procHovFile(file,type,date){
     if(type==='forward'||type==='reverse'){
       if(!isXlsx)return;
       const buf=await file.arrayBuffer();
-      let result=readNamedSheet(buf,'HOV PD PC');
-      if(!result||result.rows.length<2){
-        // Fallback: try other common HOV sheet names, then first sheet
-        const altNames=['HOV','HOV Data','HOV_PD_PC','PD PC','Sheet1','Data'];
-        for(const alt of altNames){
-          result=readNamedSheet(buf,alt);
-          if(result&&result.rows.length>=2)break;
-        }
-        // Last resort: read first available sheet
-        if(!result||result.rows.length<2){
-          try{
-            const wb=XLSX.read(buf,{type:'array',cellFormula:false,cellText:false,cellHTML:false});
-            if(wb&&wb.SheetNames&&wb.SheetNames.length>0){
-              const ws=wb.Sheets[wb.SheetNames[0]];
-              if(ws){
-                const rows2=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
-                if(rows2&&rows2.length>=2){
-                  const hi2=findHdrRow(rows2);
-                  const hdrs2=cleanH((rows2[hi2]||[]).map(h=>String(h==null?'':h)));
-                  result={rows:rows2,sheetName:wb.SheetNames[0],headerRow:hi2,hdrs:hdrs2};
-                }
-              }
-            }
-          }catch(e2){console.warn('HOV fallback sheet read failed:',e2.message);}
-        }
-      }
+      // PERF FIX: parse the workbook ONCE. The previous implementation called
+      // readNamedSheet() up to 7 times (each re-parsing the whole workbook up
+      // to 3 times = 21 full parses). On a ~11 MB / 8k-row × 181-col file that
+      // is minutes of blocked main thread → "Page Unresponsive".
+      const result=readHovWorkbookOnce(buf);
       if(!result||result.rows.length<2){
         console.warn('HOV: no readable sheet found in',file.name);return;
       }
@@ -4243,7 +4292,7 @@ async function procHovFile(file,type,date){
         const buf=await file.arrayBuffer();
         let result=null;
         const hasPako=typeof pako!=='undefined';
-        if(hasPako){result=await readExcelNative(buf, f.name);}
+        if(hasPako){try{result=await readExcelNative(buf, file.name);}catch(_){result=null;}}
         if(!result||result.rows.length<2)result=readExcel(buf,null);
         if(!result||result.rows.length<2){
           console.warn('HOV: no rows found in',file.name);return;
@@ -5537,9 +5586,12 @@ function _tgtEcomExcluded(row){
   return v==='#N/A'||v==='N/A'||v==='#NA'||v==='NA';
 }
 
-/* FORWARD: Pivot = RECEIVED_AT_DC; age from Ageing_from_Bag_Rec ONLY; age===6. */
+/* FORWARD: Pivot = RECEIVED_AT_DC; age from Ageing_from_Bag_Rec ONLY; age===6.
+   Every AWB is counted at most ONCE (dedup via Set) to prevent inflated counts
+   from duplicate rows in the source file. */
 function _extractForwardCounts(rows){
   const counts={};
+  const seen=new Set();
   for(const row of rows){
     if(!row||!Object.values(row).some(v=>String(v).trim()))continue;
     // ── ECOM DATA filter (applied BEFORE any other calculation) ──
@@ -5551,6 +5603,9 @@ function _extractForwardCounts(rows){
     if(ageStr==='')continue;
     const age=Math.round(parseFloat(ageStr));
     if(age!==6)continue;
+    // ── AWB-level dedup: count each AWB only once ──
+    const awb=gv(row,'awb_number','Awb_number','AWB_NUMBER','awb number','awb','AWB','dsp_awb_number','DSP_Awb_number');
+    if(awb){if(seen.has(awb))continue;seen.add(awb);}
     const locRaw=gv(row,'current_location','Current_location','Current_Location','currentlocation','current location','location','Location')||'UNKNOWN';
     const loc=_tgtRegisterName(locRaw);
     counts[loc]=(counts[loc]||0)+1;
@@ -5558,9 +5613,11 @@ function _extractForwardCounts(rows){
   return counts;
 }
 
-/* REVERSE: Reason ∈ {RECEIVED_AT_DC, MISROUTED}; age from Ageing ONLY; age===target. */
+/* REVERSE: Reason ∈ {RECEIVED_AT_DC, MISROUTED}; age from Ageing ONLY; age===target.
+   Every AWB is counted at most ONCE (dedup via Set). */
 function _extractReverseCounts(rows,targetAge){
   const counts={};
+  const seen=new Set();
   for(const row of rows){
     if(!row||!Object.values(row).some(v=>String(v).trim()))continue;
     // ── ECOM DATA filter (applied BEFORE any other calculation) ──
@@ -5572,6 +5629,9 @@ function _extractReverseCounts(rows,targetAge){
     if(ageStr==='')continue;
     const age=Math.round(parseFloat(ageStr));
     if(age!==targetAge)continue;
+    // ── AWB-level dedup: count each AWB only once ──
+    const awb=gv(row,'awb_number','Awb_number','AWB_NUMBER','awb number','awb','AWB','dsp_awb_number','DSP_Awb_number');
+    if(awb){if(seen.has(awb))continue;seen.add(awb);}
     const locRaw=gv(row,'current_location','Current_location','Current_Location','currentlocation','current location','location','Location')||'UNKNOWN';
     const loc=_tgtRegisterName(locRaw);
     counts[loc]=(counts[loc]||0)+1;
@@ -6323,15 +6383,29 @@ function renderHovD15Pivot(type,rows){
 /* ── Per-tab upload (forces the tab's own file type) ── */
 async function runHovTypeFile(type,file){
   if(!file)return;
-  setHovP(true,`⚙  Reading ${HOV_TYPE_LABELS[type]} file…`);
+  const sizeMB=file.size/1048576;
+  setHovP(true,`⚙  Reading ${HOV_TYPE_LABELS[type]} file (${sizeMB.toFixed(1)} MB)…`);
+  const badge0=document.getElementById('hovBadge_'+type);
+  if(badge0){badge0.innerHTML=`⚙ Parsing <strong>${xe(file.name.slice(0,40))}</strong> — large files may take a few seconds…`;badge0.style.color='var(--tx3)';}
   const date=xDate(file.name);
+  // Yield twice so the browser paints the progress state before the
+  // synchronous XLSX parse blocks the main thread.
+  await new Promise(r=>setTimeout(r,0));
+  await new Promise(r=>requestAnimationFrame(()=>r()));
   try{
     await procHovFile(file,type,date);
+    const rowsLoaded=(master.hovAllRaw||[]).filter(r=>r.fileType===type).length;
     const badge=document.getElementById('hovBadge_'+type);
     if(badge){badge.innerHTML=`✅ Processed <strong>${xe(file.name.slice(0,40))}</strong>`;badge.style.color='var(--brand)';}
-    toast(`🚁 ${HOV_TYPE_LABELS[type]} file processed`,'tok');
+    if(!rowsLoaded){
+      toast(`⚠ ${HOV_TYPE_LABELS[type]} file read, but no HOV rows matched the filters`,'tw');
+    }else{
+      toast(`🚁 ${HOV_TYPE_LABELS[type]} file processed`,'tok');
+    }
   }catch(e){
     console.warn('runHovTypeFile:',e);
+    const badge=document.getElementById('hovBadge_'+type);
+    if(badge){badge.innerHTML=`❌ Failed: ${xe(e.message||'parse error')}`;badge.style.color='#b91c1c';}
     toast(`❌ Could not process ${HOV_TYPE_LABELS[type]} file: ${e.message}`,'te');
   }
   setHovP(false);
@@ -9106,7 +9180,7 @@ const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rYQ';
    The dashboard auto-discovers this from the spreadsheet's __url__ sentinel row.
    You can also paste it here permanently after deploying a new version.
    Current deployment URL (update this when you redeploy):                    */
-const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbzp1KCR4UCb0myBXRQrIvetVP7D1HngFlDtp9BwGFpny-Qfn6KS6qO9oWO94nui6LAi/exec';
+const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbyHcgr4es_R6uqrcD_81zU0xkxKMEeTSnkgqWUTBwYQjXcVelJh_jW3aXlz5Lf5KnNf/exec';
 
 const GS_BOOTSTRAP_URLS=[
   `https://docs.google.com/spreadsheets/d/${GS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=MASTER+SNAPSHOT_1`,
