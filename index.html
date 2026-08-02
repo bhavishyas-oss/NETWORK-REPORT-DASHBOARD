@@ -809,7 +809,7 @@ const SECS=[
     title:'FORWARD R@DC',
     badge:'PIVOT=R@DC',
     src:'forward',
-    ageOpts:[3,6],
+    ageOpts:[3,6,10],   // D10 added — completes the D3/D6/D10 grid across all 4 sections
     binOpts:[1,2],
     msgOpts:['ALL','SUCCESS'],
   },
@@ -9137,7 +9137,7 @@ function downloadChart(canvasId,filename){
    are deleted before new ones are appended.
 ═══════════════════════════════════════════════ */
 const GS_URL_KEY='logistics_gsheets_url_v2';
-const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rYQ';
+const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rY';
 
 /* ── CROSS-DEVICE VISIBILITY STRATEGY ──────────────────────────────────────────
    Problem: The AppScript URL only existed in the admin's localStorage.
@@ -9180,7 +9180,7 @@ const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rYQ';
    The dashboard auto-discovers this from the spreadsheet's __url__ sentinel row.
    You can also paste it here permanently after deploying a new version.
    Current deployment URL (update this when you redeploy):                    */
-const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbyHcgr4es_R6uqrcD_81zU0xkxKMEeTSnkgqWUTBwYQjXcVelJh_jW3aXlz5Lf5KnNf/exec';
+const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbxJ1OVHXwVNFaI6p5TqlxS8o4hf4n_qOcG6zGmCDn-qBhdfisF7kUXHoSO-QDIXaGsw/exec';
 
 const GS_BOOTSTRAP_URLS=[
   `https://docs.google.com/spreadsheets/d/${GS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=MASTER+SNAPSHOT_1`,
@@ -10799,22 +10799,35 @@ async function pushMasterSnapshot(){
   }
   if(!rows.length){console.log('[pushMasterSnapshot] 0 rows to push');return;}
 
+  // PERF/RELIABILITY FIX: this snapshot grows with every date ever uploaded
+  // (can reach many thousands of rows). Sending it as one request eventually
+  // times out or is rejected, which used to throw and abort the D3/D6/D10
+  // daily-age-sheet push that runs right after this in runFiles(). Chunk it
+  // (same 500-row pattern as pushSectionDate) and NEVER throw — log/toast on
+  // failure and return, so callers can always continue to the next step.
   console.log(`[pushMasterSnapshot] Pushing ${rows.length} records to MASTER SNAPSHOT…`);
-  const payload={type:'master_snapshot',rows,ts};
-  const r=await _sheetsFetch(url,payload);
-
-  if(r.ok===null){
-    // no-cors opaque response — treat as success (cannot read body)
-    console.log(`[pushMasterSnapshot] ✅ Pushed ${rows.length} rows (opaque response — no-cors)`);
-    return;
+  const CHUNK=500;
+  let anyFailed=false;
+  for(let i=0;i<rows.length;i+=CHUNK){
+    const chunk=rows.slice(i,i+CHUNK);
+    const payload={type:'master_snapshot',rows:chunk,ts,append:i>0};
+    try{
+      const r=await _sheetsFetch(url,payload);
+      if(r.ok===false){
+        console.warn(`[pushMasterSnapshot] chunk ${Math.floor(i/CHUNK)+1} failed:`,r.body?.error||r.body);
+        anyFailed=true;
+      }
+    }catch(e){
+      console.warn(`[pushMasterSnapshot] chunk ${Math.floor(i/CHUNK)+1} error:`,e.message);
+      anyFailed=true;
+    }
+    if(i+CHUNK<rows.length)await new Promise(res=>setTimeout(res,100));
   }
-  if(r.ok){
-    console.log(`[pushMasterSnapshot] ✅ Pushed ${rows.length} rows — server response OK`);
-    return;
+  if(anyFailed){
+    toast('⚠ Master snapshot partially synced — will retry on next upload.','tw');
+  }else{
+    console.log(`[pushMasterSnapshot] ✅ Pushed ${rows.length} rows across ${Math.ceil(rows.length/CHUNK)} chunk(s)`);
   }
-  // ok===false — server returned error
-  const errMsg=r.body?.error||JSON.stringify(r.body||{});
-  throw new Error(`Sheets push failed: ${errMsg}`);
 }
 
 /* ── Fetch master snapshot from Sheets (backend-driven restore) ──
