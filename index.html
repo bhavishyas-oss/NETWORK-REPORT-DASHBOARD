@@ -2578,10 +2578,12 @@ async function runFiles(files){
   renderTab(activeTab);
 
   // Push master snapshot synchronously — this is the authoritative restore point.
-  // Must succeed so View Mode and re-login work correctly.
+  // Only the date(s) touched by THIS upload run need to be (re)synced — older
+  // dates were already pushed on their own upload and don't need resending.
   setP(true, '📊 Saving master snapshot to Sheets…');
   try{
-    await pushMasterSnapshot();
+    const uploadedDates=new Set(valid.map(r=>r.date).filter(Boolean));
+    await pushMasterSnapshot(uploadedDates);
     const sectionCounts=[];
     const dailyAgeSheets=[];  // ← per (section × age) location×date pivot for separate Google Sheets
     for(let i=0;i<SECS.length;i++){
@@ -9137,7 +9139,7 @@ function downloadChart(canvasId,filename){
    are deleted before new ones are appended.
 ═══════════════════════════════════════════════ */
 const GS_URL_KEY='logistics_gsheets_url_v2';
-const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rY';
+const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rYQ';
 
 /* ── CROSS-DEVICE VISIBILITY STRATEGY ──────────────────────────────────────────
    Problem: The AppScript URL only existed in the admin's localStorage.
@@ -9180,7 +9182,7 @@ const GS_SHEET_ID='17JbybSZkKtdoHZBua3QyC5tcxwKYozhnILQcoXb3rY';
    The dashboard auto-discovers this from the spreadsheet's __url__ sentinel row.
    You can also paste it here permanently after deploying a new version.
    Current deployment URL (update this when you redeploy):                    */
-const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbxJ1OVHXwVNFaI6p5TqlxS8o4hf4n_qOcG6zGmCDn-qBhdfisF7kUXHoSO-QDIXaGsw/exec';
+const GS_HARDCODED_URL='https://script.google.com/macros/s/AKfycbzAUuxMdcKqviWCc96z9QlbYJl9y2zQXfhcJBGiCHQ8dQLQbYfNFH0R8jIVKFlmHYaQ/exec';
 
 const GS_BOOTSTRAP_URLS=[
   `https://docs.google.com/spreadsheets/d/${GS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=MASTER+SNAPSHOT_1`,
@@ -10769,11 +10771,19 @@ async function runSheetsPush(results){
    Each row: [Type, Date, Count, LocsJSON, BinsJSON, MsgsJSON, Timestamp].
    No single cell ever exceeds ~5KB. No data loss possible.
    The AppScript reconstructs the master object server-side when fetched.     */
-async function pushMasterSnapshot(){
+async function pushMasterSnapshot(onlyDates){
   const url=getGsUrl();
   if(!url){console.log('[pushMasterSnapshot] No Sheets URL — skipping');return;}
   const hasData=Object.values(master).some(arr=>Array.isArray(arr)&&arr.length>0);
   if(!hasData){console.log('[pushMasterSnapshot] No data to push');return;}
+
+  // PERF/RELIABILITY FIX: this snapshot used to resend EVERY date ever loaded
+  // in the browser session (weeks/months of history) on every single upload,
+  // which made both the request payload and the server-side dedup scan grow
+  // without bound — eventually timing out ("partially synced"). When the
+  // caller knows which date(s) were just uploaded (onlyDates), restrict the
+  // push to those — already-synced historical dates don't need resending.
+  const dateFilter=(onlyDates&&onlyDates.size)?onlyDates:null;
 
   const ts=new Date().toISOString();
   const rows=[];
@@ -10784,6 +10794,7 @@ async function pushMasterSnapshot(){
     if(!Array.isArray(arr)||!arr.length)continue;
     for(const rec of arr){
       if(!rec||!rec.date)continue;
+      if(dateFilter&&!dateFilter.has(rec.date))continue;
       rows.push([
         type,
         rec.date,
